@@ -1,0 +1,65 @@
+# ─── Unity 缓存 ───
+Library/
+Temp/
+Logs/
+Build/
+Builds/
+UserSettings/
+.idea/
+.vs/
+.vscode/
+*.csproj
+*.sln
+.claude/
+
+# ─── 解包资源（目录+meta） ───
+Assets/Animation*
+Assets/Resources*
+Assets/TutorialInfo*
+Assets/Readme*
+Assets/UniversalRenderPipelineGlobalSettings*
+
+# ─── 资源文件类型 ───
+*.fbx
+*.png
+*.jpg
+*.jpeg
+*.psd
+*.tga
+*.obj
+*.blend
+*.mat
+*.anim
+*.controller
+*.prefab
+*.wav
+*.mp3
+*.mp4
+*.webm
+
+# ─── 资源文件类型的 .meta ───
+*.fbx.meta
+*.png.meta
+*.jpg.meta
+*.jpeg.meta
+*.psd.meta
+*.tga.meta
+*.obj.meta
+*.blend.meta
+*.mat.meta
+*.anim.meta
+*.controller.meta
+*.prefab.meta
+*.wav.meta
+*.mp3.meta
+*.mp4.meta
+*.webm.meta
+
+# ─── .asset 只保留 Settings 下的 ───
+*.asset
+!Assets/Settings/*.asset
+!Assets/Settings/**/*.asset
+
+*.asset.meta
+!Assets/Settings/*.asset.meta
+!Assets/Settings/**/*.asset.meta
