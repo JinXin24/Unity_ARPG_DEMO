@@ -24,6 +24,13 @@ public class PhysicsConfig
     [Header("前方碰到单位后停下 (米)")]
     public float stopDst;
 
+    [Header("移动子节点（而不是根节点）")]
+    public bool moveChild;
+    [Header("子节点路径")]
+    public string childPath;
+    [Header("状态结束时子节点归零")]
+    public bool resetChildOnEnd;
+
     static AnimationCurve EaseOutCurve() => new AnimationCurve(
         new Keyframe(0f, 1f, 0f, -2f),
         new Keyframe(1f, 0f, -2f, 0f)

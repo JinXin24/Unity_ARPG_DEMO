@@ -26,6 +26,7 @@
   - 走/跑切换：左 Shift
   - 技能键：E
 - `InputSystemController` 用旧 API 封装，外部接口不变，方便后续切换
+- **ProjectSettings activeInputHandler 必须设为 2（Both）**，否则旧版 Input API 不可用
 
 ## 动画
 
@@ -118,6 +119,13 @@
 - `FormCollider`：每形态的 height / radius / center，[SerializeField] 可调
 - `OnSkillTriggered` 重写：按目标 StateId 首位判断（1=人类，2=机甲）自动切形态
 - Inspector 有 `currentForm` 运行时标识方便观察
+
+**强化E与双人同屏**：
+- `OnEnhanceSkill` 列：float[]，格式 `[离场状态ID, 进场状态ID]`
+- `UnlockEnhance` 列：bool，进入该状态时启动 4 秒强化期
+- 流程：进入普攻4 → `OnStateBegin` → `enhanceTimeLeft = 4s` → 强化期内按E → `OnEnhanceSkillTriggered(离场, 进场)` → 双人同屏，离场动画播完自动关模型
+- `CanUseEnhanceSkill()`：强化期内返回 true，屏蔽普通E技能
+- 位置：[AimisiCharacter.cs](Assets/Scripts/FSM/AimisiCharacter.cs)
 
 **输入**：
 - `InputSystemController.Instance.GetMoveInput()` → Vector2

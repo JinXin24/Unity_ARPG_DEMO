@@ -105,6 +105,10 @@ public class CharacterState : MonoBehaviour
             if (cfg.OnSkill != null && cfg.OnSkill.Length >= 3)
                 AddListener(cfg.StateId, StateEventType.Update, OnSkillCheck);
 
+            // 注册强化技能检测：有 OnEnhanceSkill 配置时，每帧检测
+            if (cfg.OnEnhanceSkill != null && cfg.OnEnhanceSkill.Length >= 2)
+                AddListener(cfg.StateId, StateEventType.Update, OnEnhanceSkillCheck);
+
             // 注册位移：SO 里有该状态的位移配置时
             if (motionDict != null && motionDict.ContainsKey(cfg.StateId))
             {
@@ -131,7 +135,7 @@ public class CharacterState : MonoBehaviour
         CurrentState.SetBeginTime();
     }
 
-    void Update()
+    protected virtual void Update()
     {
         if (CurrentState == null || animator == null) return;
 
@@ -223,6 +227,7 @@ public class CharacterState : MonoBehaviour
     {
         if (InputSystemController.Instance.GetSkillPressed())
         {
+            if (CanUseEnhanceSkill()) return; // 强化期内，普通E让给强化E
             if (CheckConfig(CurrentState.Config.OnSkill))
             {
                 int targetId = (int)CurrentState.Config.OnSkill[2];
@@ -235,6 +240,47 @@ public class CharacterState : MonoBehaviour
     protected virtual void OnSkillTriggered(int targetStateId)
     {
         ToNext(targetStateId);
+    }
+
+    /// <summary>按 StateId 查动画名（供子类跨形态播动画用）</summary>
+    protected string GetAnimName(int stateId)
+    {
+        if (stateData.TryGetValue(stateId, out var ps))
+            return ps.Config.AnimName;
+        return null;
+    }
+
+    /// <summary>
+    /// 强化技能检测：`OnEnhanceSkill` 格式 [离场状态, 进场状态]。
+    /// 强化期是否可用由子类 `CanUseEnhanceSkill()` 决定。
+    /// </summary>
+    void OnEnhanceSkillCheck()
+    {
+        if (!InputSystemController.Instance.GetSkillPressed()) return;
+        Debug.Log($"[强化E] E键按下, CanUseEnhanceSkill={CanUseEnhanceSkill()}");
+        if (!CanUseEnhanceSkill()) return;
+        var cfg = CurrentState.Config;
+        if (cfg.OnEnhanceSkill == null || cfg.OnEnhanceSkill.Length < 2)
+        {
+            Debug.Log($"[强化E] 当前状态{CurrentState.Id}无OnEnhanceSkill配置");
+            return;
+        }
+        Debug.Log($"[强化E] 窗口检查 t={GetNormalizedTime():F2} cfg=[{cfg.OnEnhanceSkill[0]},{cfg.OnEnhanceSkill[1]}] check={CheckConfig(cfg.OnEnhanceSkill)}");
+        if (!CheckConfig(cfg.OnEnhanceSkill)) return;
+
+        int leaveState = (int)cfg.OnEnhanceSkill[0];
+        int enterState = (int)cfg.OnEnhanceSkill[1];
+        Debug.Log($"[强化E] 触发! 离场={leaveState}({GetAnimName(leaveState)}) 进场={enterState}({GetAnimName(enterState)})");
+        OnEnhanceSkillTriggered(leaveState, enterState);
+    }
+
+    /// <summary>强化技能是否可用，子类重写（默认不可用）</summary>
+    protected virtual bool CanUseEnhanceSkill() => false;
+
+    /// <summary>强化技能触发。子类可重写实现双形态同屏。</summary>
+    protected virtual void OnEnhanceSkillTriggered(int leaveStateId, int enterStateId)
+    {
+        ToNext(enterStateId);
     }
 
     // ═══════ 位移（参照 Demo_3D_RPG_ PhysicsService） ═══════
@@ -305,21 +351,23 @@ public class CharacterState : MonoBehaviour
         float cy = activePhysics.curveY.Evaluate(progress);
         float cz = activePhysics.curveZ.Evaluate(progress);
         Vector3 localMove = Vector3.Scale(activePhysicsVelocity, new Vector3(cx, cy, cz)) * Time.deltaTime;
-        Vector3 move = transform.TransformDirection(localMove); // 相对坐标 → 世界坐标
 
-        if (!activePhysics.ignoreGravity)
-            move.y += Physics.gravity.y * Time.deltaTime;
-
-        Vector3 posBefore = transform.position;
-        characterController.Move(move);
-        Debug.Log($"[位移帧] move={move:F4} posDelta={Vector3.Distance(posBefore, transform.position):F4} t={t:F4} progress={progress:F2}");
+        if (activePhysics.moveChild)
+        {
+            // 只移动子节点，绕开 CharacterController
+            var child = string.IsNullOrEmpty(activePhysics.childPath) ? null : transform.Find(activePhysics.childPath);
+            if (child != null)
+                child.localPosition += localMove;
+        }
+        else
+        {
+            Vector3 move = transform.TransformDirection(localMove); // 相对坐标 → 世界坐标
+            if (!activePhysics.ignoreGravity)
+                move.y += Physics.gravity.y * Time.deltaTime;
+            characterController.Move(move);
+        }
 
         // 前方检测到单位则停下
-        if (activePhysics.stopDst > 0f)
-        {
-            if (Physics.Raycast(transform.position + Vector3.up, transform.forward, activePhysics.stopDst))
-                activePhysics = null;
-        }
         if (activePhysics.stopDst > 0f)
         {
             if (Physics.Raycast(transform.position + Vector3.up, transform.forward, activePhysics.stopDst))
@@ -329,6 +377,12 @@ public class CharacterState : MonoBehaviour
 
     void OnPhysicsEnd()
     {
+        // 状态结束时子节点位置归零
+        if (activePhysics != null && activePhysics.moveChild && activePhysics.resetChildOnEnd)
+        {
+            var child = string.IsNullOrEmpty(activePhysics.childPath) ? null : transform.Find(activePhysics.childPath);
+            if (child != null) child.localPosition = Vector3.zero;
+        }
         activePhysics = null;
     }
 
@@ -453,8 +507,12 @@ public class CharacterState : MonoBehaviour
         animEndFired = false;
         animator.CrossFade(CurrentState.Config.AnimName, 0.016f);
         DOStateEvent(CurrentState.Id, StateEventType.Begin);
+        OnStateBegin(CurrentState);
         return true;
     }
+
+    /// <summary>状态进入钩子，子类可重写（如普攻4进入时解锁强化）</summary>
+    protected virtual void OnStateBegin(PlayerState state) { }
 
     // ═══════ 事件系统 ═══════
 

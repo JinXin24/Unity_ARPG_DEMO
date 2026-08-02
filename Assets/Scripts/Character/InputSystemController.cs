@@ -11,7 +11,6 @@ public class InputSystemController : Singleton<InputSystemController>
         float v = Input.GetAxis("Vertical");
         return new Vector2(h, v);
     }
-    
 
     public bool GetAttackPressed() => Input.GetMouseButtonDown(0);
     public bool GetSprintToggled() => Input.GetKeyDown(KeyCode.LeftShift);

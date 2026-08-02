@@ -15,6 +15,11 @@ public class RootBonePositionCleaner : EditorWindow
     private List<BoneDisplacement> singleScanResult = new List<BoneDisplacement>();
     private Vector2 singleScroll;
 
+    // 缩放动画位移
+    private string scaleBonePath;
+    private bool scaleX = true, scaleY = false, scaleZ = false;
+    private float scaleFactor = 0.5f;
+
     // 批量
     private List<AnimationClip> batchClipList = new List<AnimationClip>();
     private bool showBatchList = true;
@@ -88,6 +93,37 @@ public class RootBonePositionCleaner : EditorWindow
                 EditorGUILayout.EndScrollView();
             }
         }
+
+        // ═══ 缩放动画位移 ═══
+        EditorGUILayout.Space(15);
+        GUILayout.Label("═══ 缩放动画位移 ═══", EditorStyles.boldLabel);
+
+        // 骨骼路径下拉选择（从扫描结果里选）
+        var boneOptions = singleScanResult.Select(b => b.path).ToArray();
+        if (boneOptions.Length == 0) boneOptions = new[] { "先点上面的'扫描'按钮" };
+        int selectedIdx = System.Array.IndexOf(boneOptions, scaleBonePath);
+        if (selectedIdx < 0) selectedIdx = 0;
+        selectedIdx = EditorGUILayout.Popup("骨骼", selectedIdx, boneOptions);
+        if (boneOptions.Length > 0) scaleBonePath = boneOptions[selectedIdx];
+
+        EditorGUILayout.BeginHorizontal();
+        scaleX = GUILayout.Toggle(scaleX, "X");
+        scaleY = GUILayout.Toggle(scaleY, "Y");
+        scaleZ = GUILayout.Toggle(scaleZ, "Z");
+        EditorGUILayout.EndHorizontal();
+
+        scaleFactor = EditorGUILayout.FloatField("缩放系数 (0.5=减半, 2=加倍)", scaleFactor);
+
+        EditorGUI.BeginDisabledGroup(targetClip == null || isSubAsset || string.IsNullOrEmpty(scaleBonePath) || boneOptions[0].StartsWith("先点"));
+        if (GUILayout.Button("🔨 缩放选中骨骼的位移", GUILayout.Height(28)))
+        {
+            int count = ScaleBonePosition(targetClip, scaleBonePath, scaleX, scaleY, scaleZ, scaleFactor);
+            AssetDatabase.SaveAssets();
+            singleScanResult = ScanAllBonesDisplacement(targetClip);
+            EditorUtility.DisplayDialog("完成", $"已缩放 {count} 条曲线\n路径: {scaleBonePath}\n系数: {scaleFactor}", "好的");
+        }
+        EditorGUI.EndDisabledGroup();
+        EditorGUILayout.Space(5);
 
         // ═══ 批量 ═══
         EditorGUILayout.Space(15);
@@ -319,5 +355,40 @@ public class RootBonePositionCleaner : EditorWindow
         }
         EditorUtility.SetDirty(clip);
         return cleared;
+    }
+
+    /// <summary>缩放指定骨骼的 Position 曲线，可选择缩放哪些轴</summary>
+    public static int ScaleBonePosition(AnimationClip clip, string bonePath, bool scaleX = true, bool scaleY = true, bool scaleZ = true, float factor = 0.5f)
+    {
+        int scaled = 0;
+        foreach (var binding in AnimationUtility.GetCurveBindings(clip))
+        {
+            if (binding.path != bonePath) continue;
+            string prop = binding.propertyName.ToLower();
+            if (!prop.Contains("position") && !prop.Contains("m_localposition")) continue;
+
+            // 判断当前曲线属于哪个轴
+            bool isX = prop.EndsWith(".x") || prop == "m_localposition.x";
+            bool isY = prop.EndsWith(".y") || prop == "m_localposition.y";
+            bool isZ = prop.EndsWith(".z") || prop == "m_localposition.z";
+            if (!isX && !isY && !isZ) continue;
+
+            // 该轴没勾选 → 跳过
+            if (isX && !scaleX) continue;
+            if (isY && !scaleY) continue;
+            if (isZ && !scaleZ) continue;
+
+            AnimationCurve curve = AnimationUtility.GetEditorCurve(clip, binding);
+            if (curve == null || curve.keys.Length == 0) continue;
+
+            var keys = curve.keys;
+            for (int i = 0; i < keys.Length; i++)
+            { keys[i].value *= factor; keys[i].inTangent *= factor; keys[i].outTangent *= factor; }
+            curve.keys = keys;
+            AnimationUtility.SetEditorCurve(clip, binding, curve);
+            scaled++;
+        }
+        EditorUtility.SetDirty(clip);
+        return scaled;
     }
 }
