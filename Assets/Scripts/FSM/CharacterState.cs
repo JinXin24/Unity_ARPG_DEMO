@@ -14,13 +14,15 @@ public class PlayerState
 
 public class CharacterState : MonoBehaviour
 {
-    [SerializeField] private Animator animator;
-    [SerializeField] private StateSO[] stateConfigs;
+    [SerializeField] protected Animator animator;
+    [SerializeField] private StateSOList stateConfigList;
     [SerializeField] private StateMotionSO motionSO;
+    [SerializeField] private StateEffectSO effectSO;
+    [SerializeField] private StateWeaponSO weaponSO;
 
     public PlayerState CurrentState { get; private set; }
     private Dictionary<int, PlayerState> stateData = new();
-    private CharacterController characterController;
+    protected CharacterController characterController;
 
     // Blend Tree — 1D, Speed 参数 (0=待机, 0.5=走, 1=跑)
     private float speedVelocity;
@@ -37,13 +39,22 @@ public class CharacterState : MonoBehaviour
     private Dictionary<int, HashSet<int>> physicsExecuted = new(); // stateId → executed config indices
     private PhysicsConfig activePhysics;
     private Vector3 activePhysicsVelocity;
-    private float activePhysicsTriggerNorm;  // 归一化后的 trigger
-    private float activePhysicsTimeNorm;     // 归一化后的 time
+    private float activePhysicsTriggerNorm;
+    private float activePhysicsTimeNorm;
     private bool animEndFired;
+
+    // 特效
+    private Dictionary<int, StateEffectData> effectDict;
+    private Dictionary<int, HashSet<int>> effectSpawned = new();
+    private Dictionary<int, List<GameObject>> activeEffects = new();
+
+    // 武器显隐
+    private Dictionary<int, StateWeaponData> weaponDict;
 
     void Start()
     {
-        characterController = GetComponent<CharacterController>();
+        if (characterController == null)
+            characterController = GetComponentInChildren<CharacterController>();
         if (characterController == null)
             Debug.LogWarning($"[CharacterState] {name} 没有 CharacterController，位移不会生效");
 
@@ -59,8 +70,25 @@ public class CharacterState : MonoBehaviour
             Debug.LogWarning($"[CharacterState] {name} 未拖入 StateMotionSO");
         }
 
-        if (stateConfigs.Length == 0) return;
-        foreach (var cfg in stateConfigs)
+        // 构建特效配置字典
+        if (effectSO != null)
+        {
+            effectDict = effectSO.states.Where(s => s.effects.Count > 0)
+                .ToDictionary(s => s.StateId);
+            Debug.Log($"[CharacterState] 已加载 {effectDict.Count} 个特效配置: {string.Join(", ", effectDict.Keys)}");
+        }
+
+        // 构建武器显隐字典
+        if (weaponSO != null)
+        {
+            weaponDict = weaponSO.states.Where(s => s.weapons.Count > 0)
+                .ToDictionary(s => s.StateId);
+            Debug.Log($"[CharacterState] 已加载 {weaponDict.Count} 个武器配置: {string.Join(", ", weaponDict.Keys)}");
+        }
+
+        if (stateConfigList == null || stateConfigList.list.Count == 0) return;
+        var cfgs = stateConfigList.list;
+        foreach (var cfg in cfgs)
         {
             var ps = new PlayerState { Id = cfg.StateId, Config = cfg };
             stateData[cfg.StateId] = ps;
@@ -73,6 +101,10 @@ public class CharacterState : MonoBehaviour
             if (cfg.OnMove != null && cfg.OnMove.Length >= 3)
                 AddListener(cfg.StateId, StateEventType.Update, OnMove);
 
+            // 注册技能检测：有 OnSkill 配置时，每帧检测技能输入
+            if (cfg.OnSkill != null && cfg.OnSkill.Length >= 3)
+                AddListener(cfg.StateId, StateEventType.Update, OnSkillCheck);
+
             // 注册位移：SO 里有该状态的位移配置时
             if (motionDict != null && motionDict.ContainsKey(cfg.StateId))
             {
@@ -80,8 +112,22 @@ public class CharacterState : MonoBehaviour
                 AddListener(cfg.StateId, StateEventType.Update, OnPhysicsUpdate);
                 AddListener(cfg.StateId, StateEventType.End, OnPhysicsEnd);
             }
+
+            // 注册特效：SO 里有该状态的特效配置时
+            if (effectDict != null && effectDict.ContainsKey(cfg.StateId))
+            {
+                AddListener(cfg.StateId, StateEventType.Begin, OnEffectBegin);
+                AddListener(cfg.StateId, StateEventType.Update, OnEffectUpdate);
+            }
+
+            // 注册武器显隐：SO 里有该状态的武器配置时
+            if (weaponDict != null && weaponDict.ContainsKey(cfg.StateId))
+            {
+                AddListener(cfg.StateId, StateEventType.Begin, OnWeaponBegin);
+                AddListener(cfg.StateId, StateEventType.Update, OnWeaponUpdate);
+            }
         }
-        CurrentState = stateData[stateConfigs[0].StateId];
+        CurrentState = stateData[cfgs[0].StateId];
         CurrentState.SetBeginTime();
     }
 
@@ -173,6 +219,24 @@ public class CharacterState : MonoBehaviour
         }
     }
 
+    void OnSkillCheck()
+    {
+        if (InputSystemController.Instance.GetSkillPressed())
+        {
+            if (CheckConfig(CurrentState.Config.OnSkill))
+            {
+                int targetId = (int)CurrentState.Config.OnSkill[2];
+                OnSkillTriggered(targetId);
+            }
+        }
+    }
+
+    /// <summary>技能触发。子类可重写做形态切换等前置逻辑。</summary>
+    protected virtual void OnSkillTriggered(int targetStateId)
+    {
+        ToNext(targetStateId);
+    }
+
     // ═══════ 位移（参照 Demo_3D_RPG_ PhysicsService） ═══════
 
     void OnPhysicsBegin()
@@ -195,39 +259,38 @@ public class CharacterState : MonoBehaviour
 
         bool justTriggered = false;
 
-        // 帧数 → 归一化时间 转换
+        // 秒 → 归一化时间 转换
         bool inTransition = animator.IsInTransition(0);
         var stateInfo = inTransition ? animator.GetNextAnimatorStateInfo(0) : animator.GetCurrentAnimatorStateInfo(0);
-        var clipInfos = inTransition ? animator.GetNextAnimatorClipInfo(0) : animator.GetCurrentAnimatorClipInfo(0);
-        // Clip 真实长度和帧率（Timeline 上能看到），用于帧→归一化换算
-        float clipLen = clipInfos.Length > 0 ? clipInfos[0].clip.length : stateInfo.length;
-        float clipFps = clipInfos.Length > 0 ? clipInfos[0].clip.frameRate : motionData.frameRate;
-        float totalFrames = clipLen * clipFps;
-        // 实际播放时长（可能被 Animator 加速/减速），用于速度计算
-        float realPlayLen = stateInfo.length;
+        float clipLen = stateInfo.length;
+        if (clipLen <= 0.001f) clipLen = 1f;
 
         // 检查新触发的位移配置
         for (int i = 0; i < motionData.physicsConfigs.Count; i++)
         {
             if (executed.Contains(i)) continue;
             var cfg = motionData.physicsConfigs[i];
-            float triggerNorm = cfg.triggerFrame / totalFrames;
-            float timeNorm = cfg.endFrame / totalFrames;
+            if (!cfg.enabled) continue;
+            float triggerNorm = cfg.triggerSec / clipLen;
+            float timeNorm = cfg.endSec / clipLen;
 
             if (t >= triggerNorm)
             {
                 executed.Add(i);
                 activePhysics = cfg;
                 justTriggered = true;
-                float duration = realPlayLen * (timeNorm - triggerNorm);
+                float duration = cfg.endSec - cfg.triggerSec;
                 activePhysicsVelocity = duration > 0.001f ? cfg.force / duration : cfg.force;
-                // 存归一化 time 用于后续帧检查
                 activePhysicsTriggerNorm = triggerNorm;
                 activePhysicsTimeNorm = timeNorm;
-                Debug.Log($"[位移] StateId={CurrentState.Id} 触发! force={cfg.force} frames=[{cfg.triggerFrame},{cfg.endFrame}] totalFrames={totalFrames:F0} realPlay={realPlayLen:F3}s duration={duration:F3}s velocity={activePhysicsVelocity}");
+                Debug.Log($"[位移] StateId={CurrentState.Id} 触发! force={cfg.force} time=[{cfg.triggerSec},{cfg.endSec}]s clip={clipLen:F2}s duration={duration:F3}s velocity={activePhysicsVelocity}");
                 break;
             }
         }
+
+        // 运行中也可通过 Inspector 关闭位移
+        if (activePhysics != null && !activePhysics.enabled)
+            activePhysics = null;
 
         // 应用当前位移（刚触发的同一帧不做过期检查）
         if (activePhysics == null) return;
@@ -238,7 +301,10 @@ public class CharacterState : MonoBehaviour
         }
 
         float progress = (t - activePhysicsTriggerNorm) / Mathf.Max(0.0001f, activePhysicsTimeNorm - activePhysicsTriggerNorm);
-        Vector3 localMove = activePhysicsVelocity * Time.deltaTime * activePhysics.curve.Evaluate(progress);
+        float cx = activePhysics.curveX.Evaluate(progress);
+        float cy = activePhysics.curveY.Evaluate(progress);
+        float cz = activePhysics.curveZ.Evaluate(progress);
+        Vector3 localMove = Vector3.Scale(activePhysicsVelocity, new Vector3(cx, cy, cz)) * Time.deltaTime;
         Vector3 move = transform.TransformDirection(localMove); // 相对坐标 → 世界坐标
 
         if (!activePhysics.ignoreGravity)
@@ -264,6 +330,95 @@ public class CharacterState : MonoBehaviour
     void OnPhysicsEnd()
     {
         activePhysics = null;
+    }
+
+    // ═══════ 特效 ═══════
+
+    void OnEffectBegin()
+    {
+        int id = CurrentState.Id;
+        if (!effectSpawned.ContainsKey(id)) effectSpawned[id] = new HashSet<int>();
+        else effectSpawned[id].Clear();
+        // 清理上次残留的特效实例
+        if (activeEffects.TryGetValue(id, out var list))
+        {
+            foreach (var go in list) if (go != null) Destroy(go);
+            list.Clear();
+        }
+        else activeEffects[id] = new List<GameObject>();
+    }
+
+    void OnEffectUpdate()
+    {
+        if (effectDict == null) return;
+        if (!effectDict.TryGetValue(CurrentState.Id, out var effectData)) return;
+
+        float t = GetNormalizedTime();
+        var spawned = effectSpawned[CurrentState.Id];
+        float clipLen = animator.GetCurrentAnimatorStateInfo(0).length;
+        if (clipLen <= 0.001f) clipLen = 1f;
+
+        for (int i = 0; i < effectData.effects.Count; i++)
+        {
+            if (spawned.Contains(i)) continue;
+            var cfg = effectData.effects[i];
+            if (!cfg.enabled) continue;
+
+            float triggerNorm = cfg.triggerSec / clipLen;
+            if (t >= triggerNorm)
+            {
+                spawned.Add(i);
+                Transform parent = string.IsNullOrEmpty(cfg.bindPoint)
+                    ? transform : transform.Find(cfg.bindPoint);
+                if (parent == null) parent = transform;
+
+                var go = Instantiate(cfg.effectPrefab, parent);
+                go.transform.localPosition = cfg.offset;
+                go.transform.localRotation = Quaternion.Euler(cfg.rotation);
+
+                activeEffects[CurrentState.Id].Add(go);
+
+                if (cfg.duration > 0f)
+                    Destroy(go, cfg.duration);
+
+                Debug.Log($"[特效] StateId={CurrentState.Id} idx={i} trigger={cfg.triggerSec}s prefab={cfg.effectPrefab?.name}");
+            }
+        }
+    }
+
+    // ═══════ 武器显隐 ═══════
+
+    void OnWeaponBegin()
+    {
+        if (!weaponDict.TryGetValue(CurrentState.Id, out var data)) return;
+        foreach (var w in data.weapons)
+        {
+            var t = string.IsNullOrEmpty(w.weaponPath) ? null : transform.Find(w.weaponPath);
+            if (t != null) t.gameObject.SetActive(false);
+        }
+    }
+
+    void OnWeaponUpdate()
+    {
+        if (!weaponDict.TryGetValue(CurrentState.Id, out var data)) return;
+        float t = GetNormalizedTime();
+        float clipLen = animator.GetCurrentAnimatorStateInfo(0).length;
+        if (clipLen <= 0.001f) clipLen = 1f;
+
+        foreach (var w in data.weapons)
+        {
+            if (!w.enabled) continue;
+            var tr = string.IsNullOrEmpty(w.weaponPath) ? null : transform.Find(w.weaponPath);
+            if (tr == null) continue;
+
+            float showNorm = w.showSec / clipLen;
+            float hideNorm = w.hideSec / clipLen;
+
+            if (t >= showNorm && t < hideNorm)
+                tr.gameObject.SetActive(true);
+            else if (t >= hideNorm)
+                tr.gameObject.SetActive(false);
+        }
     }
 
     // ═══════ 旋转（参照 Demo_3D_RPG_ DORotate） ═══════

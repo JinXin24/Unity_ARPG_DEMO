@@ -36,6 +36,8 @@ public class ConfigManager : MonoBehaviour
         }
     }
 
+    
+
     public List<T> GetAll<T>() where T : ScriptableObject
     {
         if (!cache.TryGetValue(typeof(T).Name, out var list)) return new List<T>();

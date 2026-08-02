@@ -1,23 +1,25 @@
 using UnityEngine;
 
 /// <summary>
-/// 输入控制器 — Singleton，基于 CharacterInputActions.inputactions。
+/// 输入控制器 — Singleton，基于旧版 Input Manager。
 /// </summary>
 public class InputSystemController : Singleton<InputSystemController>
 {
-    private CharacterInputActions input;
-
-    protected override void Awake()
+    public Vector2 GetMoveInput()
     {
-        base.Awake();
-        input = new CharacterInputActions();
+        float h = Input.GetAxis("Horizontal");
+        float v = Input.GetAxis("Vertical");
+        return new Vector2(h, v);
     }
+    
 
-    void OnEnable() => input?.Player.Enable();
-    void OnDisable() => input?.Player.Disable();
-    void OnDestroy() => input?.Dispose();
+    public bool GetAttackPressed() => Input.GetMouseButtonDown(0);
+    public bool GetSprintToggled() => Input.GetKeyDown(KeyCode.LeftShift);
+    public bool GetSkillPressed() => Input.GetKeyDown(KeyCode.E);
 
-    public bool GetAttackPressed() => input?.Player.Attack.WasPressedThisFrame() ?? false;
-    public bool GetSprintToggled() => input?.Player.LShift.WasPressedThisFrame() ?? false;
-    public Vector2 GetMoveInput() => input?.Player.Move.ReadValue<Vector2>() ?? Vector2.zero;
+
+
 }
+
+
+

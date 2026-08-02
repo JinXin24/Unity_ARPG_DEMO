@@ -5,21 +5,29 @@ using System.Collections.Generic;
 [System.Serializable]
 public class PhysicsConfig
 {
-    [Header("触发帧")]
-    public int triggerFrame;
-    [Header("结束帧")]
-    public int endFrame;
-    [Header("位移向量 (米)：窗口内总位移量")]
+    [Header("启用位移")]
+    public bool enabled = true;
+    [Header("触发时间 (秒)")]
+    public float triggerSec;
+    [Header("结束时间 (秒)")]
+    public float endSec;
+    [Header("位移强度 (不是最终米数，配合曲线调)")]
     public Vector3 force;
-    [Header("速度曲线：横轴=时间进度，纵轴=速度倍率")]
-    public AnimationCurve curve = new AnimationCurve(
-        new Keyframe(0f, 1f, 0f, -2f),   // 开头满速，快速下降
-        new Keyframe(1f, 0f, -2f, 0f)    // 末尾归零，自然停住
-    );
-    [Header("是否忽略重力")]
+    [Header("X 轴速度曲线 (1=全速, 0=停)")]
+    public AnimationCurve curveX = EaseOutCurve();
+    [Header("Y 轴速度曲线 (1=全速, 0=停)")]
+    public AnimationCurve curveY = EaseOutCurve();
+    [Header("Z 轴速度曲线 (1=全速, 0=停)")]
+    public AnimationCurve curveZ = EaseOutCurve();
+    [Header("忽略重力")]
     public bool ignoreGravity;
-    [Header("前方检测到单位后停下")]
+    [Header("前方碰到单位后停下 (米)")]
     public float stopDst;
+
+    static AnimationCurve EaseOutCurve() => new AnimationCurve(
+        new Keyframe(0f, 1f, 0f, -2f),
+        new Keyframe(1f, 0f, -2f, 0f)
+    );
 }
 
 /// <summary>单个状态的位移配置列表</summary>
@@ -27,8 +35,6 @@ public class PhysicsConfig
 public class StateMotionData
 {
     public int StateId;
-    [Header("你的动画帧率（Timeline 上显示的）")]
-    public float frameRate = 30f;
     [Header("物理位移配置")]
     public List<PhysicsConfig> physicsConfigs = new();
 }

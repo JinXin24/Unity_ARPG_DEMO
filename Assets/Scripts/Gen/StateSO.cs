@@ -9,4 +9,5 @@ public class StateSO : ScriptableObject
     public int OnAnimEnd;
     public float[] OnMove;
     public float[] OnAtk;
+    public float[] OnSkill;
 }

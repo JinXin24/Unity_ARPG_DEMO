@@ -16,14 +16,16 @@
 
 ## 输入系统
 
-- 使用 Input System Package（`com.unity.inputsystem`）
-- 版本由用户在 Package Manager 中管理，**AI 禁止修改 `manifest.json` 中的 inputsystem 版本**
-- `.inputactions` 资源 → 生成 C# 包装类
+- 使用旧版 Input Manager（`Input.GetKeyDown` / `Input.GetAxis`），不用 Input System Package
+- 原因：新 Input System `.inputactions` 缓存频繁损坏，生成代码不稳定
 - `InputSystemController : Singleton<InputSystemController>` 是输入入口
 - 业务代码通过 `InputSystemController.Instance.GetAttackPressed()` 读输入
-- 使用 `WasPressedThisFrame()` 而非 `performed` 回调
-- 禁止用旧 Input API（`Input.GetKeyDown` 等）
-- 禁止手写 `new InputAction()`
+- 按键映射：
+  - 攻击：鼠标左键
+  - 移动：WASD（Horizontal/Vertical 轴）
+  - 走/跑切换：左 Shift
+  - 技能键：E
+- `InputSystemController` 用旧 API 封装，外部接口不变，方便后续切换
 
 ## 动画
 
@@ -43,6 +45,9 @@
 - ExcelToSO 依赖：Python 3 + openpyxl
 - 数组类型：类型行写 `int[]` `float[]` `string[]`，值用分号分隔（`12;15;18;21;24`）
 - bool 值：用 `TRUE` / `FALSE`（Excel 默认大写）
+- **导出 List SO**：整张表打包进一个 `{表名}SOList.asset` 容器，元素用 `AddObjectToAsset` 挂为子资产
+  - 好处：加新行不用重新拖 SO，引用不断
+  - 流程：`生成 C# List 容器类`（仅首次）→ 编译 → 每次改表点 `导出 List SO`
 
 ## 状态机写法规范
 
@@ -62,6 +67,7 @@
 | `On_anm_end` | int | 播完切哪个状态（空=循环） | 空 |
 | `On_move` | float[] | 移动窗口：`[窗口末, 窗口始, 目标状态ID]` | `0.3;0.7;1002` |
 | `On_Atk` | float[] | 攻击窗口：`[窗口末, 窗口始, 目标状态ID]` | `1;1;10021` |
+| `On_Skill` | float[] | 技能窗口：`[窗口末, 窗口始, 目标状态ID]` | `1;1;20021` |
 | `On_stop` | int | 停止移动时切回哪个状态 | 1001 |
 
 状态之间通过 `State_id` 数字引用，不依赖字符串。
@@ -98,16 +104,30 @@
 - 状态通过 `State_id` 数字引用，不依赖字符串
 
 **CharacterState 组件**：
-- 挂 Unit 上，`[SerializeField]` 拖 Animator 和 StateSO[]
+- 挂 Unit 上，`[SerializeField]` 拖 Animator 和 `StateSOList`（List 容器）
 - `PlayerState`：运行时数据（Id、Config、BeginTime）
 - `stateData`：`Dictionary<int, PlayerState>`，用 StateId 做 key
 - `ToNext(int stateId)`：从字典取出 → 当前状态 End 事件 → 切过去 → CrossFade（0.016f）→ 新状态 Begin 事件
 - `AddListener(stateId, eventType, callback)` / `DOStateEvent(stateId, eventType)`：事件系统
 - 事件类型：`Begin`（进入）、`Update`（每帧）、`End`（退出）、`OnAnmEnd`（动画播完）
+- **技能虚函数**：`OnSkillTriggered(int targetStateId)` `protected virtual`，按 E 检测 `OnSkill` 窗口后调用
+
+**AimisiCharacter（双形态子类）**：
+- 双 Animator + 双模型（人类/机甲），共用根节点 CharacterController
+- `SwitchToHuman()` / `SwitchToMech()`：切换 Animator + 模型显隐 + 碰撞体参数
+- `FormCollider`：每形态的 height / radius / center，[SerializeField] 可调
+- `OnSkillTriggered` 重写：按目标 StateId 首位判断（1=人类，2=机甲）自动切形态
+- Inspector 有 `currentForm` 运行时标识方便观察
 
 **输入**：
 - `InputSystemController.Instance.GetMoveInput()` → Vector2
 - `InputSystemController.Instance.GetAttackPressed()` → bool
+- `InputSystemController.Instance.GetSkillPressed()` → bool（E 键）
+
+**技能与形态切换**：
+- `CharacterState.OnSkill()`：`protected virtual`，按 E 触发，子类可重写
+- `AimisiCharacter.OnSkill()`：重写为切换人/机甲形态 + 碰撞体参数
+- 位置：[CharacterState.cs](Assets/Scripts/FSM/CharacterState.cs) / [AimisiCharacter.cs](Assets/Scripts/FSM/AimisiCharacter.cs)
 
 ### 第 4 步：攻击系统
 
@@ -127,23 +147,50 @@
 
 ### 第 5 步：位移系统
 
-**架构**：攻击位移用 ScriptableObject 配置（AnimationCurve），不用 Excel（Excel 存不了曲线）。
+**架构**：攻击位移用 ScriptableObject 配置（AnimationCurve），不用 Excel（Excel 存不了曲线）。每轴独立曲线。
 
 | 文件 | 作用 |
 |------|------|
-| [StateMotionSO.cs](Assets/Scripts/Combat/StateMotionSO.cs) | SO 容器，`List<StateMotionData>`，每行含 `StateId` + `List<PhysicsConfig>` |
-| `PhysicsConfig` | `trigger` / `time` / `force` / `curve` / `ignoreGravity` / `stopDst` |
+| [StateMotionSO.cs](Assets/Scripts/Combat/StateMotionSO.cs) | SO 容器，`StateId` + `List<PhysicsConfig>` |
+| `PhysicsConfig` | `triggerSec` / `endSec`（秒）、`force`（强度，非最终米数）、`curveX/Y/Z`（每轴独立速度曲线）、`ignoreGravity`、`stopDst` |
+
+**曲线含义**：
+- 横轴 = 时间进度（0~1），纵轴 = 速度倍率（1=全速，0=停）
+- `force` 不是最终位移米数，是跟曲线配合调的强度值，需要肉眼校准
+- 每轴独立曲线：Z 管前冲、Y 管跳跃、X 管侧移，互不干扰
+- 默认曲线 `EaseOutCurve()`：`(0,1)→(1,0)` 先快后慢
 
 **使用方式**：
-1. Unit 上挂 `CharacterController`（代码会 `GetComponent`）
+1. Unit 上挂 `CharacterController`（代码 `GetComponent`）
 2. `CharacterState` 拖入 `StateMotionSO`
-3. Inspector 里给每个攻击状态配位移曲线（右键 → Create → 配置 → 状态位移配置）
+3. Inspector 里给每个攻击状态配位移（右键 → Create → 配置 → 状态位移配置）
+4. `triggerSec`/`endSec` 直接填秒数，看动画窗口的时间轴，不需要管帧率
 
 **流程**（参照 Demo_3D_RPG_ PhysicsService）：
 - `OnPhysicsBegin`：重置已执行标记、清空当前位移
-- `OnPhysicsUpdate`：检查 trigger → 计算 `velocity = force / duration` → 每帧 `curve.Evaluate(progress)` 加权 → `characterController.Move()`
+- `OnPhysicsUpdate`：秒→归一化换算 → 检查 trigger → `velocity = force / duration` → 逐帧 `Vector3.Scale(velocity, (curveX, curveY, curveZ)) * dt` → `characterController.Move()`
 - `OnPhysicsEnd`：清空当前位移
+- `GetNormalizedTime()` 在 CrossFade 期间读 `GetNextAnimatorStateInfo` 避免拿到旧状态的时间
 - 位置：[CharacterState.cs:142-203](Assets/Scripts/FSM/CharacterState.cs#L142-L203)
+
+### 第 6 步：动画数据提取与坐标系陷阱
+
+**坐标系映射**：
+- DCC 工具（Blender/Maya）：**Z 朝上，Y 朝前**
+- Unity：**Y 朝上，Z 朝前**
+- 从 DCC 导出的 FBX 动画里，**Y 轴存的是角色的前后位移，不是在跳**。Unity 里看 Root.Y 的曲线以为是上下颠簸，实际是前进方向
+- 部分模型有 **Armature Scale = 100** 的全局缩放，位置曲线值要 ×100 才是真实米数
+
+**AI 提取位移数据**：
+- 直接把 `.anim` 文件（Unity 导出 YAML 格式）丢给 AI 分析
+- AI 能扫描 `m_PositionCurves` 段、找到 Root 骨骼路径、提取所有关键帧的 XYZ 值
+- 结合 Scale 系数和坐标系映射，算出每帧真实位移量和速度变化
+- 根据速度变化点自动生成 AnimationCurve 关键帧
+
+**根骨骼位移清零**：
+- `Apply Root Motion` 关了但动画曲线还在 = 角色会瞬移到动画位置再瞬移回来（闪烁 bug）
+- 必须用 [RootBonePositionCleaner.cs](Assets/Plugins/AI_Tools/Editor/RootBonePositionCleaner.cs) 把根骨骼 Position 曲线归零
+- 菜单：Tools → 根骨骼位移清零器 → 扫描 → 清零
 
 参照 `D:\computer\project\Demo_3D_RPG_\Assets\Script\Player\FSM.cs` 的模式：
 
@@ -186,5 +233,5 @@
 
 - 不要引入 Luban 或第三方 FSM 框架
 - 不要在 Update 里用 `GetComponent`
-- 不要手写 `new InputAction()`
 - 不要用 `animator.SetTrigger/SetBool` 做状态切换——用 `CrossFade`
+- 输入统一走 `InputSystemController`，不要在各处分散读键
