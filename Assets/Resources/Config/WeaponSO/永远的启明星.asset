@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1d33bc2b011aa0d498c229ae9972c1bf, type: 3}
+  m_Name: "\u6C38\u8FDC\u7684\u542F\u660E\u661F"
+  m_EditorClassIdentifier: 
+  Id: 1001
+  Name: "\u6C38\u8FDC\u7684\u542F\u660E\u661F"
+  Quality: 5
+  Type: 2
+  ExclusiveChar: "\u7231\u5F25\u65AF"
+  BaseAtk: 47
+  MaxAtk: 587
+  SubStatType: 8
+  SubStatLv1: 5.4
+  SubStatMax: 24.3
+  SkillName: "\u9010\u661F"
+  SkillDesc: "\u5168\u5C5E\u6027\u4F24\u5BB3\u52A0\u6210\u63D0\u5347{0}%\u3002\u9644\u52A0\u9707\u8C10\xB7\u504F\u79FB\u6216\u805A\u7206\u6548\u5E94\u65F6\uFF0C\u5171\u9E23\u89E3\u653E\u4F24\u5BB3\u65E0\u89C6\u76EE\u6807{1}%\u9632\u5FA1\uFF0C\u65E0\u89C6\u76EE\u6807{2}%\u70ED\u7194\u6297\u6027\uFF0C\u6301\u7EED8\u79D2\u3002"
+  RefineParams: 12;32;10|15;40;15|18;48;20|21;56;25|24;64;30

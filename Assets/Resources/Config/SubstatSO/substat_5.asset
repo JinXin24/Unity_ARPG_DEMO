@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6c1ecf55ebd3b3c45b51975cefd86e61, type: 3}
+  m_Name: substat_5
+  m_EditorClassIdentifier: 
+  Id: 5
+  Name: "\u66B4\u51FB\u4F24\u5BB3%"
+  NameEN: CritDmg
+  IsPercent: 1
+  ShortName: "\u7206\u4F24"

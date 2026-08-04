@@ -1,0 +1,10 @@
+[
+  {"CharacterId":1001,"Level":1,"Hp":1050,"Atk":26,"Def":68},
+  {"CharacterId":1001,"Level":20,"Hp":2340,"Atk":62,"Def":162},
+  {"CharacterId":1001,"Level":40,"Hp":4250,"Atk":114,"Def":298},
+  {"CharacterId":1001,"Level":50,"Hp":5720,"Atk":154,"Def":402},
+  {"CharacterId":1001,"Level":60,"Hp":7200,"Atk":196,"Def":510},
+  {"CharacterId":1001,"Level":70,"Hp":8840,"Atk":242,"Def":630},
+  {"CharacterId":1001,"Level":80,"Hp":10650,"Atk":292,"Def":758},
+  {"CharacterId":1001,"Level":90,"Hp":12850,"Atk":338,"Def":876}
+]

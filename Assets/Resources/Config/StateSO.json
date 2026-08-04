@@ -1,0 +1,7 @@
+[
+  {"CharacterId":1001,"UseCommon":False,"State_id":1001,"Info":"待机","Anm_name":"Stand","On_move":"1;1;10021;10022;10023;10024"},
+  {"CharacterId":1001,"UseCommon":False,"State_id":10021,"Info":"往前走","Anm_name":"Walk_F","On_stop":1001},
+  {"CharacterId":1001,"UseCommon":False,"State_id":10022,"Info":"往后走","Anm_name":"Walk_B","On_stop":1001},
+  {"CharacterId":1001,"UseCommon":False,"State_id":10023,"Info":"往左走","Anm_name":"Walk_LB","On_stop":1001},
+  {"CharacterId":1001,"UseCommon":False,"State_id":10024,"Info":"往右走","Anm_name":"Walk_LF","On_stop":1001}
+]

@@ -1,0 +1,4 @@
+[
+  {"CharacterId":1001,"FormName":"默认","WeaponType":2,"ModelPath":"Aimisi_Default","UnlockLevel":1},
+  {"CharacterId":1001,"FormName":"机兵","WeaponType":2,"ModelPath":"Aimisi_Mecha","UnlockLevel":1}
+]

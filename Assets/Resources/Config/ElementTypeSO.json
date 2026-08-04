@@ -1,0 +1,8 @@
+[
+  {"Id":1,"Name":"热熔","NameEN":"Fusion"},
+  {"Id":2,"Name":"冷凝","NameEN":"Glacio"},
+  {"Id":3,"Name":"导电","NameEN":"Electro"},
+  {"Id":4,"Name":"气动","NameEN":"Aero"},
+  {"Id":5,"Name":"衍射","NameEN":"Spectro"},
+  {"Id":6,"Name":"湮灭","NameEN":"Havoc"}
+]
