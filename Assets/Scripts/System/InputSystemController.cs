@@ -5,12 +5,21 @@ using UnityEngine;
 /// </summary>
 public class InputSystemController : Singleton<InputSystemController>
 {
+    protected override void Awake()
+    {
+        base.Awake();
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
+    }
+
     public Vector2 GetMoveInput()
     {
         float h = Input.GetAxis("Horizontal");
         float v = Input.GetAxis("Vertical");
         return new Vector2(h, v);
     }
+
+    public float GetScrollInput() => Input.GetAxis("Mouse ScrollWheel");
 
     public bool GetAttackPressed() => Input.GetMouseButtonDown(0);
     public bool GetSprintToggled() => Input.GetKeyDown(KeyCode.LeftShift);

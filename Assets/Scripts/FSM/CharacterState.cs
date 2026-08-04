@@ -19,6 +19,7 @@ public class CharacterState : MonoBehaviour
     [SerializeField] private StateMotionSO motionSO;
     [SerializeField] private StateEffectSO effectSO;
     [SerializeField] private StateWeaponSO weaponSO;
+    [SerializeField] private MoveConfigSO moveConfig;
 
     public PlayerState CurrentState { get; private set; }
     private Dictionary<int, PlayerState> stateData = new();
@@ -159,6 +160,13 @@ public class CharacterState : MonoBehaviour
         // 旋转 — 参照 Demo_3D_RPG_ DORotate：面向输入方向（相对相机）
         DORotate();
 
+        // 移动：Blend Tree Speed → 世界位移速度（按状态区分）
+        if (moveConfig != null && characterController != null && currentSpeed > 0.01f)
+        {
+            float worldSpeed = moveConfig.GetMoveSpeed(CurrentState.Id, currentSpeed);
+            characterController.Move(transform.forward * worldSpeed * Time.deltaTime);
+        }
+
         // 动画播完检测（用原始 normalizedTime，不用 %1f 的版本）
         if (!animEndFired && !animator.IsInTransition(0))
         {
@@ -257,20 +265,13 @@ public class CharacterState : MonoBehaviour
     void OnEnhanceSkillCheck()
     {
         if (!InputSystemController.Instance.GetSkillPressed()) return;
-        Debug.Log($"[强化E] E键按下, CanUseEnhanceSkill={CanUseEnhanceSkill()}");
         if (!CanUseEnhanceSkill()) return;
         var cfg = CurrentState.Config;
-        if (cfg.OnEnhanceSkill == null || cfg.OnEnhanceSkill.Length < 2)
-        {
-            Debug.Log($"[强化E] 当前状态{CurrentState.Id}无OnEnhanceSkill配置");
-            return;
-        }
-        Debug.Log($"[强化E] 窗口检查 t={GetNormalizedTime():F2} cfg=[{cfg.OnEnhanceSkill[0]},{cfg.OnEnhanceSkill[1]}] check={CheckConfig(cfg.OnEnhanceSkill)}");
+        if (cfg.OnEnhanceSkill == null || cfg.OnEnhanceSkill.Length < 2) return;
         if (!CheckConfig(cfg.OnEnhanceSkill)) return;
 
         int leaveState = (int)cfg.OnEnhanceSkill[0];
         int enterState = (int)cfg.OnEnhanceSkill[1];
-        Debug.Log($"[强化E] 触发! 离场={leaveState}({GetAnimName(leaveState)}) 进场={enterState}({GetAnimName(enterState)})");
         OnEnhanceSkillTriggered(leaveState, enterState);
     }
 

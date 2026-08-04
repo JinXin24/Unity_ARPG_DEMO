@@ -158,6 +158,8 @@ public class AimisiCharacter : CharacterState
         if (mechModel != null) mechModel.SetActive(false);
         leavingAnimator = null;
         leavingModel = null;
+        if (CameraSystemController.Instance != null)
+            CameraSystemController.Instance.SetForm(false);
     }
 
     public void SwitchToMech()
@@ -170,6 +172,8 @@ public class AimisiCharacter : CharacterState
         if (mechModel != null) mechModel.SetActive(true);
         leavingAnimator = null;
         leavingModel = null;
+        if (CameraSystemController.Instance != null)
+            CameraSystemController.Instance.SetForm(true);
     }
 
     void ApplyCollider(FormCollider c)

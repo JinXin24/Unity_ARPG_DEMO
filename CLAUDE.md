@@ -243,3 +243,4 @@
 - 不要在 Update 里用 `GetComponent`
 - 不要用 `animator.SetTrigger/SetBool` 做状态切换——用 `CrossFade`
 - 输入统一走 `InputSystemController`，不要在各处分散读键
+- **禁止未经用户明确同意修改环境配置**：`manifest.json`、`ProjectSettings`、`Package Manager`、`.inputactions`、`activeInputHandler` 等——只能提建议，不能动手改
