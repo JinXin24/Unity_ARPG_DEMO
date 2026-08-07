@@ -230,6 +230,48 @@
 - 攻击取消窗口：代码读 `CancelOpen` 数组（60fps 基准），配合输入缓冲
 - 攻击段循环：`(segment + 1) % Attacks.Length`
 
+## 相机系统
+
+**架构**：`CameraStateSO` 时间线 → `CharacterState` 处理 → `CameraParamEvent` 通知 → `CameraController` 平滑追赶。
+
+| 文件 | 作用 |
+|------|------|
+| [CameraStateSO.cs](Assets/Scripts/StateConfig/CameraStateSO.cs) | SO 配置，`StateId` + `List<CameraKeyframe>` 时间线 |
+| [CameraController.cs](Assets/Scripts/System/CameraController.cs) | 轨道相机，接收事件、平滑追赶目标值 |
+| [CameraParamEvent.cs](Assets/Scripts/JinXinFramework/Event/CameraParamEvent.cs) | 状态机→相机参数通知（ArmLength/Yaw/Pitch/PivotPath/LockInput） |
+| [CameraLockEvent.cs](Assets/Scripts/JinXinFramework/Event/CameraLockEvent.cs) | 锁定相机 + 释放（CameraReleaseEvent） |
+| [CameraZoomEvent.cs](Assets/Scripts/JinXinFramework/Event/CameraZoomEvent.cs) | 形态切换时调整臂长范围 |
+
+**CameraKeyframe 字段**：
+- `triggerSec`：触发时间（秒），相对于动画开头
+- `duration`：该段持续时间（秒），到期自动 Release
+- `targetDistance`：目标臂长，`0` = 不改变
+- `targetYaw`：目标偏航角（**相对角色朝向**），`-999` = 不改变
+- `targetPitch`：目标俯仰角，`-999` = 不改变
+- `lockInput`：期间禁用鼠标/滚轮输入
+- `pivotPath`：挂点子物体路径，`null` = 不改变
+
+**数据流**：
+1. `CharacterState.OnCameraBegin()` — 重置 keyframe 追踪
+2. `CharacterState.OnCameraUpdate()` — 时间轴检测 → `targetYaw` 叠角色 `transform.eulerAngles.y` 转世界角度 → `EventBus.Publish(CameraParamEvent)`
+3. 时间线最后一段 duration 到期 → `EventBus.Publish(CameraParamEvent.Release)`
+4. 状态被中断 → `OnCameraEnd()` → 也发 Release，防止 `lockInput` 泄漏
+5. `CameraController.OnEvent(CameraParamEvent)` — 哨兵值判断 → 写入 `desired*` 目标值
+
+**CameraController 目标值 + 平滑追赶**：
+- `desiredYaw` / `desiredPitch` / `desiredArmLength` — 目标值，事件写入
+- 鼠标/滚轮输入叠加到目标值上（未锁时）
+- LateUpdate 用 `SmoothDamp` 从当前值平滑追到目标值（yaw/pitch 用 `rotationSmoothTime`，臂长用 `armSmoothTime`）
+- 相机绕目标独立公转，不跟角色自转
+
+**哨兵值约定**：
+- `ArmLength = 0` → 不改变当前臂长
+- `Yaw = -999` → 不改变当前偏航
+- `Pitch = -999` → 不改变当前俯仰
+- `PivotPath = null` → 不改变当前挂点
+
+**事件订阅**：`CameraController` 实现了 5 个 `IEventReceiver`：`FormSwitchedEvent`（切换跟随目标）、`CameraZoomEvent`（调整臂长范围）、`CameraParamEvent`（参数驱动）、`CameraLockEvent`（锁定）、`CameraReleaseEvent`（释放）。
+
 ## 命名
 
 - C# 类名：PascalCase

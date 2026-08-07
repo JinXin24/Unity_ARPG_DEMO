@@ -1,6 +1,7 @@
 using UnityEngine;
 using System.Collections.Generic;
 using System.Linq;
+using JinXinFramework.Event;
 
 public enum StateEventType { Begin, Update, End, OnAnmEnd }
 
@@ -20,6 +21,7 @@ public class CharacterState : MonoBehaviour
     [SerializeField] private StateEffectSO effectSO;
     [SerializeField] private StateWeaponSO weaponSO;
     [SerializeField] private MoveConfigSO moveConfig;
+    [SerializeField] protected CameraStateSO cameraSO;
 
     public PlayerState CurrentState { get; private set; }
     private Dictionary<int, PlayerState> stateData = new();
@@ -51,6 +53,10 @@ public class CharacterState : MonoBehaviour
 
     // 武器显隐
     private Dictionary<int, StateWeaponData> weaponDict;
+
+    // 相机镜头
+    private Dictionary<int, CameraStateData> cameraDict;
+    private Dictionary<int, int> cameraKeyframeTrack = new(); // stateId → 已触发的 keyframe 索引
 
     void Start()
     {
@@ -85,6 +91,14 @@ public class CharacterState : MonoBehaviour
             weaponDict = weaponSO.states.Where(s => s.weapons.Count > 0)
                 .ToDictionary(s => s.StateId);
             Debug.Log($"[CharacterState] 已加载 {weaponDict.Count} 个武器配置: {string.Join(", ", weaponDict.Keys)}");
+        }
+
+        // 构建相机镜头字典
+        if (cameraSO != null)
+        {
+            cameraDict = cameraSO.states.Where(s => s.timeline.Count > 0)
+                .ToDictionary(s => s.StateId);
+            Debug.Log($"[CharacterState] 已加载 {cameraDict.Count} 个镜头配置: {string.Join(", ", cameraDict.Keys)}");
         }
 
         if (stateConfigList == null || stateConfigList.list.Count == 0) return;
@@ -130,6 +144,14 @@ public class CharacterState : MonoBehaviour
             {
                 AddListener(cfg.StateId, StateEventType.Begin, OnWeaponBegin);
                 AddListener(cfg.StateId, StateEventType.Update, OnWeaponUpdate);
+            }
+
+            // 注册相机镜头：SO 里有该状态的镜头配置时
+            if (cameraDict != null && cameraDict.ContainsKey(cfg.StateId))
+            {
+                AddListener(cfg.StateId, StateEventType.Begin, OnCameraBegin);
+                AddListener(cfg.StateId, StateEventType.Update, OnCameraUpdate);
+                AddListener(cfg.StateId, StateEventType.End, OnCameraEnd);
             }
         }
         CurrentState = stateData[cfgs[0].StateId];
@@ -476,6 +498,55 @@ public class CharacterState : MonoBehaviour
         }
     }
 
+    // ═══════ 相机镜头 ═══════
+
+    void OnCameraBegin()
+    {
+        int id = CurrentState.Id;
+        cameraKeyframeTrack[id] = -1;
+    }
+
+    void OnCameraUpdate()
+    {
+        if (!cameraDict.TryGetValue(CurrentState.Id, out var data)) return;
+        float t = GetNormalizedTime();
+        float clipLen = animator.GetCurrentAnimatorStateInfo(0).length;
+        if (clipLen <= 0.001f) clipLen = 1f;
+        int lastIdx = cameraKeyframeTrack[CurrentState.Id];
+
+        for (int i = 0; i < data.timeline.Count; i++)
+        {
+            if (i <= lastIdx) continue;
+            var kf = data.timeline[i];
+            if (t >= kf.triggerSec / clipLen)
+            {
+                cameraKeyframeTrack[CurrentState.Id] = i;
+                // targetYaw 是相对角色的，叠上角色当前朝向转世界角度（哨兵 -999 保持不变）
+                float worldYaw = kf.targetYaw;
+                if (Mathf.Abs(kf.targetYaw + 999f) > 0.01f)
+                    worldYaw = kf.targetYaw + transform.eulerAngles.y;
+                EventBus.Publish(new CameraParamEvent(kf.targetDistance, worldYaw, kf.targetPitch, kf.pivotPath, kf.lockInput));
+            }
+        }
+
+        // 时间线播完 → 解锁（lastIdx 有效 && 已是最后一段）
+        if (lastIdx >= 0 && lastIdx < data.timeline.Count && lastIdx + 1 >= data.timeline.Count)
+        {
+            var lastKf = data.timeline[lastIdx];
+            if (t >= (lastKf.triggerSec + lastKf.duration) / clipLen)
+            {
+                cameraKeyframeTrack[CurrentState.Id] = lastIdx + 1; // 标记已解锁，不再重复发
+                EventBus.Publish(CameraParamEvent.Release);
+            }
+        }
+    }
+
+    void OnCameraEnd()
+    {
+        // 状态被中断时释放相机锁定，防止 lockInput 泄漏
+        EventBus.Publish(CameraParamEvent.Release);
+    }
+
     // ═══════ 旋转（参照 Demo_3D_RPG_ DORotate） ═══════
 
     void DORotate()
@@ -509,6 +580,7 @@ public class CharacterState : MonoBehaviour
         animator.CrossFade(CurrentState.Config.AnimName, 0.016f);
         DOStateEvent(CurrentState.Id, StateEventType.Begin);
         OnStateBegin(CurrentState);
+        EventBus.Publish(new StateChangedEvent(CurrentState.Id, cameraSO)); // 通知相机切镜头
         return true;
     }
 
