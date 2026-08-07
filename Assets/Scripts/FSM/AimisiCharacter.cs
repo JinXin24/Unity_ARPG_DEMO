@@ -1,4 +1,5 @@
 using UnityEngine;
+using JinXinFramework.Event;
 
 /// <summary>角色形态的碰撞体参数</summary>
 [System.Serializable]
@@ -36,6 +37,16 @@ public class AimisiCharacter : CharacterState
         radius = 0.6f,
         center = new Vector3(0, 1.25f, 0)
     };
+
+    [Header("镜头挂点")]
+    [SerializeField] private Transform humanFollow;
+    [SerializeField] private Transform humanLookAt;
+    [SerializeField] private float humanZoomMin = 2f;
+    [SerializeField] private float humanZoomMax = 10f;
+    [SerializeField] private Transform mechFollow;
+    [SerializeField] private Transform mechLookAt;
+    [SerializeField] private float mechZoomMin = 3f;
+    [SerializeField] private float mechZoomMax = 15f;
 
     public bool IsMechForm { get; private set; }
 
@@ -121,11 +132,18 @@ public class AimisiCharacter : CharacterState
             leavingAnimator = humanAnimator;
             leavingModel = humanModel;
 
+            // 离场的是人
+            leavingAnimator = humanAnimator;
+            leavingModel = humanModel;
+
             // 主状态机切到机甲进场状态，用机甲 Animator 驱动
             animator = mechAnimator;
             IsMechForm = true;
             currentForm = "机甲";
             ApplyCollider(mechCollider);
+
+            EventBus.Publish(new FormSwitchedEvent(true, mechFollow, mechLookAt));
+            EventBus.Publish(new CameraZoomEvent(mechZoomMin, mechZoomMax));
         }
         else
         {
@@ -143,6 +161,9 @@ public class AimisiCharacter : CharacterState
             IsMechForm = false;
             currentForm = "人类";
             ApplyCollider(humanCollider);
+
+            EventBus.Publish(new FormSwitchedEvent(false, humanFollow, humanLookAt));
+            EventBus.Publish(new CameraZoomEvent(humanZoomMin, humanZoomMax));
         }
 
         ToNext(enterStateId);
@@ -158,8 +179,8 @@ public class AimisiCharacter : CharacterState
         if (mechModel != null) mechModel.SetActive(false);
         leavingAnimator = null;
         leavingModel = null;
-        if (CameraSystemController.Instance != null)
-            CameraSystemController.Instance.SetForm(false);
+        EventBus.Publish(new FormSwitchedEvent(false, humanFollow, humanLookAt));
+        EventBus.Publish(new CameraZoomEvent(humanZoomMin, humanZoomMax));
     }
 
     public void SwitchToMech()
@@ -172,8 +193,8 @@ public class AimisiCharacter : CharacterState
         if (mechModel != null) mechModel.SetActive(true);
         leavingAnimator = null;
         leavingModel = null;
-        if (CameraSystemController.Instance != null)
-            CameraSystemController.Instance.SetForm(true);
+        EventBus.Publish(new FormSwitchedEvent(true, mechFollow, mechLookAt));
+        EventBus.Publish(new CameraZoomEvent(mechZoomMin, mechZoomMax));
     }
 
     void ApplyCollider(FormCollider c)

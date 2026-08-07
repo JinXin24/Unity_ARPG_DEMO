@@ -10,4 +10,6 @@ public class StateSO : ScriptableObject
     public float[] OnMove;
     public float[] OnAtk;
     public float[] OnSkill;
+    public float[] OnEnhanceSkill;
+    public bool UnlockEnhance;
 }

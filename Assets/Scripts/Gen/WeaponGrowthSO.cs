@@ -6,3 +6,4 @@ public class WeaponGrowthSO : ScriptableObject
     public int Atk;
     public float SubStatValue;
 }
+
