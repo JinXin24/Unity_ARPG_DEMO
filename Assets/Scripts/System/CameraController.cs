@@ -30,6 +30,15 @@ public class CameraController : MonoBehaviour, IEventReceiver<FormSwitchedEvent>
     [Header("移动惯性")]
     [SerializeField] private float movementSmoothTime = 0.15f;
 
+    [Header("碰撞")]
+    [SerializeField] private LayerMask collisionMask = ~0;
+    [SerializeField] private float sphereRadius = 0.25f;
+    [SerializeField] private float collisionOffset = 0.1f;
+
+    [Header("看向目标 (测试)")]
+    [SerializeField] private bool lookAtOther;
+    [SerializeField] private Transform lookAtTarget;
+
     // ---- 当前值（每帧 SmoothDamp 追赶目标值） ----
     [SerializeField] private float yaw;
     [SerializeField] private float pitch;
@@ -149,9 +158,17 @@ public class CameraController : MonoBehaviour, IEventReceiver<FormSwitchedEvent>
         pitch     = Mathf.SmoothDamp(pitch,     desiredPitch,     ref pitchVelocity, rotationSmoothTime);
         armLength = Mathf.SmoothDamp(armLength, desiredArmLength, ref armVelocity,   armSmoothTime);
 
+        // 2.5 球体投射碰撞：碰墙秒缩，恢复靠 SmoothDamp
+        Quaternion rot = Quaternion.Euler(pitch, yaw, 0);
+        Vector3 camDir = rot * Vector3.back; // (0,0,-1) 转到世界方向
+        if (Physics.SphereCast(smoothPivot, sphereRadius, camDir, out RaycastHit hit, armLength + sphereRadius, collisionMask))
+        {
+            float safeDist = Mathf.Max(hit.distance - sphereRadius - collisionOffset, 0f);
+            armLength = Mathf.Min(armLength, safeDist);
+        }
+
         // 3. 枢轴 + 相机臂公式（绕目标独立公转，不跟角色自转）
         smoothPivot = Vector3.SmoothDamp(smoothPivot, GetRawPivot(), ref pivotVelocity, movementSmoothTime);
-        Quaternion rot = Quaternion.Euler(pitch, yaw, 0);
         transform.position = smoothPivot + rot * new Vector3(0, 0, -armLength);
         transform.rotation = rot;
     }
