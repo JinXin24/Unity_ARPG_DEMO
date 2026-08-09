@@ -525,7 +525,12 @@ public class CharacterState : MonoBehaviour
                 float worldYaw = kf.targetYaw;
                 if (Mathf.Abs(kf.targetYaw + 999f) > 0.01f)
                     worldYaw = kf.targetYaw + transform.eulerAngles.y;
-                EventBus.Publish(new CameraParamEvent(kf.targetDistance, worldYaw, kf.targetPitch, kf.pivotPath, kf.lockInput));
+
+                // 看向目标：路径字符串直接传给 CameraController 解析
+                bool hasLookAt = kf.lookAtOther && !string.IsNullOrEmpty(kf.lookAtPath);
+
+                EventBus.Publish(new CameraParamEvent(kf.targetDistance, worldYaw, kf.targetPitch, kf.pivotPath, kf.lockInput,
+                    hasLookAt, kf.lookAtPath));
             }
         }
 

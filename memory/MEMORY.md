@@ -1,0 +1,2 @@
+- [AI 替代技术美术进行动画位移曲线提取](ai-replaces-tech-animator.md) — AI 直接读取 .anim 文件计算 AnimationCurve，省掉技美岗位
+- [Scene相机参数→CameraStateSO计算](camera-keyframe-calculation.md) — yaw/pitch/armLength反算工作流 + lookAt空物品定位

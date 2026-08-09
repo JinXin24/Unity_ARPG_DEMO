@@ -26,6 +26,12 @@ public class CameraKeyframe
     [Header("相机臂挂点")]
     [Tooltip("枢轴挂点的子物体路径，如 Bip001/Bip001Pelvis。空=目标自身")]
     public string pivotPath;
+
+    [Header("看向目标")]
+    [Tooltip("开启后镜头转向指定目标")]
+    public bool lookAtOther;
+    [Tooltip("目标路径：先找角色子物体，再找场景根。如 EnemyBoss 或 Bip001/Bip001Head")]
+    public string lookAtPath;
 }
 
 /// <summary>单个状态的镜头时间线</summary>
