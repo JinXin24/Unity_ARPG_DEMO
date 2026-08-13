@@ -11,8 +11,10 @@ public class LockRootMotion : StateMachineBehaviour
         animator.applyRootMotion = false;
     }
 
+
     public override void OnStateExit(Animator animator, AnimatorStateInfo stateInfo, int layerIndex)
     {
         animator.applyRootMotion = true;
     }
+    
 }

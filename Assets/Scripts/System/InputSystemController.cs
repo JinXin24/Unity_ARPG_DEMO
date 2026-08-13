@@ -1,15 +1,95 @@
 using UnityEngine;
+using JinXinFramework.Event;
+
+/// <summary>输入模式：Explore=探索（只有主界面，鼠标锁定）/ UI=UI模式（其他界面打开，鼠标全程显示）</summary>
+public enum InputMode
+{
+    Explore,
+    UI
+}
 
 /// <summary>
 /// 输入控制器 — Singleton，基于旧版 Input Manager。
 /// </summary>
-public class InputSystemController : Singleton<InputSystemController>
+public class InputSystemController : Singleton<InputSystemController>, IEventReceiver<UIPanelChangedEvent>
 {
+    [Header("输入模式配置")]
+    [Tooltip("初始模式。运行中由 UIPanelChangedEvent 驱动：非主界面打开→UI，全部关闭→Explore")]
+    [SerializeField] private InputMode mode = InputMode.Explore;
+
+    /// <summary>当前输入模式。切换时立即应用光标状态。</summary>
+    public InputMode Mode
+    {
+        get => mode;
+        private set
+        {
+            if (mode == value) return;
+            mode = value;
+            ApplyCursorState();
+        }
+    }
+
+    public bool IsExploreMode => mode == InputMode.Explore;
+    public bool IsUIMode => mode == InputMode.UI;
+
     protected override void Awake()
     {
         base.Awake();
-        Cursor.lockState = CursorLockMode.Locked;
-        Cursor.visible = false;
+        ApplyCursorState();
+    }
+
+    void OnEnable()
+    {
+        EventBus.Subscribe<UIPanelChangedEvent>(this);
+    }
+
+    void OnDisable()
+    {
+        EventBus.Unsubscribe<UIPanelChangedEvent>(this);
+    }
+
+    public void OnEvent(UIPanelChangedEvent evt)
+    {
+        // 有任何主界面以外的界面打开 → UI 模式；全部关闭 → 探索模式
+        Mode = evt.AnyPanelOpen ? InputMode.UI : InputMode.Explore;
+    }
+
+    void Update()
+    {
+        if (mode == InputMode.UI)
+        {
+            // UI 模式：鼠标全程显示
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+            return;
+        }
+
+        // 探索模式：按住左 Alt → 呼出鼠标；松开 → 锁定
+        if (Input.GetKey(KeyCode.LeftAlt))
+        {
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+        }
+        else
+        {
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+        }
+    }
+
+    /// <summary>按当前模式立即设置光标</summary>
+    void ApplyCursorState()
+    {
+        if (mode == InputMode.UI)
+        {
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+        }
+        else
+        {
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+        }
     }
 
     public Vector2 GetMoveInput()
@@ -21,13 +101,10 @@ public class InputSystemController : Singleton<InputSystemController>
 
     public float GetScrollInput() => Input.GetAxis("Mouse ScrollWheel");
 
-    public bool GetAttackPressed() => Input.GetMouseButtonDown(0);
-    public bool GetSprintToggled() => Input.GetKeyDown(KeyCode.LeftShift);
+    public bool GetAttackPressed() => !Cursor.visible && Input.GetMouseButtonDown(0);
+    public bool GetRunModeToggled() => Input.GetKeyDown(KeyCode.LeftControl);
     public bool GetSkillPressed() => Input.GetKeyDown(KeyCode.E);
 
-
-
+    /// <summary>是否正在呼出鼠标（UI 模式或按住左 Alt 期间）</summary>
+    public bool IsCursorVisible() => Cursor.visible;
 }
-
-
-

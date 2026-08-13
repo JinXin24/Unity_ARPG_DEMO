@@ -162,8 +162,8 @@ public class CameraController : MonoBehaviour, IEventReceiver<FormSwitchedEvent>
     {
         if (target == null) return;
 
-        // 1. 输入叠加到目标值（未锁时）
-        if (!lockInput)
+        // 1. 输入叠加到目标值（未锁 且 鼠标未呼出时）
+        if (!lockInput && !InputSystemController.Instance.IsCursorVisible())
         {
             // 看向目标时禁止鼠标旋转
             bool freeLook = !(lookAtOther && lookAtTarget != null);

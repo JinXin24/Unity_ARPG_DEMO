@@ -66,14 +66,14 @@
 | `Info` | string | 中文说明 | 待机 |
 | `Anm_name` | string | AC 里的动画名 | Stand |
 | `On_anm_end` | int | 播完切哪个状态（空=循环） | 空 |
-| `On_move` | float[] | 移动窗口：`[窗口末, 窗口始, 目标状态ID]` | `0.3;0.7;1002` |
-| `On_Atk` | float[] | 攻击窗口：`[窗口末, 窗口始, 目标状态ID]` | `1;1;10021` |
-| `On_Skill` | float[] | 技能窗口：`[窗口末, 窗口始, 目标状态ID]` | `1;1;20021` |
+| `On_move` | float[] | 移动窗口：`[窗口始, 窗口末, 目标状态ID]` | `0.3;0.7;1002` |
+| `On_Atk` | float[] | 攻击窗口：`[窗口始, 窗口末, 目标状态ID]`，支持多个窗口 | `0.3;0.5;10022;0.6;1.0;10021` |
+| `On_Skill` | float[] | 技能窗口：`[窗口始, 窗口末, 目标状态ID]` | `0;1;20021` |
 | `On_stop` | int | 停止移动时切回哪个状态 | 1001 |
 
 状态之间通过 `State_id` 数字引用，不依赖字符串。
 
-`On_move` 目前为 3 个值：`[窗口末, 窗口始, 目标StateId]`。移动由 1D Blend Tree（参数 `Speed`，范围 0~1）处理。FSM 只负责 Stand ↔ Move 切换，不管理方向。Speed 写入用 `Mathf.SmoothDamp` 平滑插值，速度变量跨帧保留。
+`On_move` 目前为 3 个值：`[窗口始, 窗口末, 目标StateId]`。移动由 1D Blend Tree（参数 `Speed`，范围 0~1）处理。FSM 只负责 Stand ↔ Move 切换，不管理方向。Speed 写入用 `Mathf.SmoothDamp` 平滑插值，速度变量跨帧保留。
 
 ### 第 2 步：设置 InputSystemController
 
@@ -100,7 +100,7 @@
 - 目前只有一行：`StateId=1001, AnimName=Move`
 - 1D Blend Tree 参数 `Speed`（0=待机, 0.5=走, 1=跑）
 - 角色旋转：`DORotate()` 相机相对旋转（`SmoothDampAngle` 0.025s）
-- `OnMove` = `[窗口末, 窗口始, 目标StateId]`，移动窗口检测
+- `OnMove` = `[窗口始, 窗口末, 目标StateId]`，移动窗口检测
 - `OnStop` = 回 Stand 的 StateId
 - 状态通过 `State_id` 数字引用，不依赖字符串
 
@@ -140,18 +140,20 @@
 ### 第 4 步：攻击系统
 
 **Excel 配置**（`StateMachineConfig.xlsx` → `state` sheet）：
-- `OnAtk` 列：`float[]`，格式 `[窗口末, 窗口始, 目标StateId]`
-  - 例 `1;1;10021`：全程可取消，按攻击键切到 State `10021`
-  - 在时间窗口内（`t ≤ config[0] || t ≥ config[1]`）检测到 `GetAttackPressed()` 时 → `ToNext(targetStateId)`
+- `OnAtk` 列：`float[]`，格式 `[窗口始, 窗口末, 目标StateId]`，**支持多个窗口**（flat 数组每 3 个一组，按顺序第一个命中的生效）
+  - 例 `0.3;0.5;10022;0.6;1.0;10021`：攻击1 的命中窗口（0.3~0.5）按攻击 → 接攻击2；错过窗口，后摇区间（0.6~1.0）再按 → 回攻击1
+  - 全程可取消 = `0;1;目标StateId`（整个动画区间都命中）
+  - 在窗口内（`t ≥ 窗口始 && t ≤ 窗口末`）检测到 `GetAttackPressed()` 时 → `ToNext(targetStateId)`
 - 攻击链：`1001(Move) → 10021(Attack1) → 10022(Attack2) → 10023(Attack3) → 10024(Attack4) → 循环回 Attack1`
 - 每个攻击段 `OnAnimEnd` = `1001`（播完自动回 Move）
 
 **代码**（参照 Demo_3D_RPG_ 的 `OnAtk` / `CheckConfig`）：
-- `CheckConfig(float[] config)`：归一化时间窗口检查
+- `CheckWindow(start, end)`：归一化时间落在 `[start, end]` 才算命中（允许区间语义：前摇不命中、命中/后摇可切）
+- `CheckConfig(float[] config)`：单窗口检查，读 `config[0]`（窗口始）/`config[1]`（窗口末）
 - `GetNormalizedTime()`：`animator.GetCurrentAnimatorStateInfo(0).normalizedTime % 1f`
-- `OnAtk()`：检测 `GetAttackPressed()` → 窗口内 → `ToNext(config[2])`
+- `OnAtk()`：flat 数组每 3 个一组遍历，按顺序第一个命中的窗口生效 → `ToNext(目标StateId)`
 - 在 `Start()` 中遍历所有 `StateSO`，有 `OnAtk` 的自动注册 `Update` 事件监听
-- 位置：[CharacterState.cs:68-93](Assets/Scripts/FSM/CharacterState.cs#L68-L93)
+- 位置：[CharacterState.cs:218-270](Assets/Scripts/FSM/CharacterState.cs#L218-L270)
 
 ### 第 5 步：位移系统
 
@@ -209,7 +211,7 @@
 
 **核心方法**：
 - `ToNext(int stateId)`：从字典取出目标状态 → 当前状态 `OnEnd` → 切过去 → 新状态 `OnBegin`
-- `CheckConfig(float[] config)`：归一化时间窗口检查 — `t <= config[0] || t >= config[1]`
+- `CheckConfig(float[] config)`：归一化时间窗口检查 — 允许区间 `t >= config[0] && t <= config[1]`（config 为 `[窗口始, 窗口末]`）
 - `AnimationOnPlayEnd()`：动画播完时调用，读 `on_anm_end` 决定下一个状态（-1=停，0=重新开始，其他=跳转）
 
 **事件系统**（参照 Demo_3D_RPG_ 的 `AddListener` / `DOStateEvent`）：

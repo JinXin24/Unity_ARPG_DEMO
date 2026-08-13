@@ -20,8 +20,13 @@ public class CharacterState : MonoBehaviour
     [SerializeField] private StateMotionSO motionSO;
     [SerializeField] private StateEffectSO effectSO;
     [SerializeField] private StateWeaponSO weaponSO;
+    [SerializeField] private StateHitSO hitSO;
     [SerializeField] private MoveConfigSO moveConfig;
     [SerializeField] protected CameraStateSO cameraSO;
+
+    // 调试：Scene 视图预览命中扇形/球形用的状态ID
+    [Header("调试")]
+    [SerializeField] private int gizmoPreviewStateId = 10021;
 
     public PlayerState CurrentState { get; private set; }
     private Dictionary<int, PlayerState> stateData = new();
@@ -51,8 +56,10 @@ public class CharacterState : MonoBehaviour
     private Dictionary<int, HashSet<int>> effectSpawned = new();
     private Dictionary<int, List<GameObject>> activeEffects = new();
 
-    // 武器显隐
-    private Dictionary<int, StateWeaponData> weaponDict;
+    // 服务层
+    private readonly List<FSMServiceBase> services = new();
+    private WeaponVisibleService weaponService;
+    private HitDetectorService hitService;
 
     // 相机镜头
     private Dictionary<int, CameraStateData> cameraDict;
@@ -85,13 +92,17 @@ public class CharacterState : MonoBehaviour
             Debug.Log($"[CharacterState] 已加载 {effectDict.Count} 个特效配置: {string.Join(", ", effectDict.Keys)}");
         }
 
-        // 构建武器显隐字典
-        if (weaponSO != null)
-        {
-            weaponDict = weaponSO.states.Where(s => s.weapons.Count > 0)
-                .ToDictionary(s => s.StateId);
-            Debug.Log($"[CharacterState] 已加载 {weaponDict.Count} 个武器配置: {string.Join(", ", weaponDict.Keys)}");
-        }
+        // 服务层：武器显隐服务（配置方式和原来一样，逻辑挪到独立服务）
+        weaponService = new WeaponVisibleService(weaponSO);
+        weaponService.SetOwner(this);
+        weaponService.Init();
+        services.Add(weaponService);
+
+        // 服务层：命中检测服务（当前只支持球形检测，段内独立去重结算）
+        hitService = new HitDetectorService(hitSO);
+        hitService.SetOwner(this);
+        hitService.Init();
+        services.Add(hitService);
 
         // 构建相机镜头字典
         if (cameraSO != null)
@@ -139,13 +150,6 @@ public class CharacterState : MonoBehaviour
                 AddListener(cfg.StateId, StateEventType.Update, OnEffectUpdate);
             }
 
-            // 注册武器显隐：SO 里有该状态的武器配置时
-            if (weaponDict != null && weaponDict.ContainsKey(cfg.StateId))
-            {
-                AddListener(cfg.StateId, StateEventType.Begin, OnWeaponBegin);
-                AddListener(cfg.StateId, StateEventType.Update, OnWeaponUpdate);
-            }
-
             // 注册相机镜头：SO 里有该状态的镜头配置时
             if (cameraDict != null && cameraDict.ContainsKey(cfg.StateId))
             {
@@ -163,7 +167,7 @@ public class CharacterState : MonoBehaviour
         if (CurrentState == null || animator == null) return;
 
         // Shift 切换 走/跑 模式
-        if (InputSystemController.Instance.GetSprintToggled())
+        if (InputSystemController.Instance.GetRunModeToggled())
             runMode = !runMode;
 
         // 1D Blend Tree: 输入 Magnitude → Speed (走:0~0.5, 跑:0~1)
@@ -206,19 +210,26 @@ public class CharacterState : MonoBehaviour
         }
 
         DOStateEvent(CurrentState.Id, StateEventType.Update);
+        for (int i = 0; i < services.Count; i++) services[i].OnUpdate();
     }
 
     // ═══════ 攻击检测（参照 Demo_3D_RPG_ OnAtk） ═══════
 
-    /// <summary>归一化时间窗口检查：t ≤ config[0] 或 t ≥ config[1]</summary>
+    /// <summary>窗口内检查：归一化时间落在 [start, end] 内才算命中（前摇不命中、命中/后摇区间可切）</summary>
+    bool CheckWindow(float start, float end)
+    {
+        float t = GetNormalizedTime();
+        return t >= start && t <= end;
+    }
+
+    /// <summary>单窗口配置检查：config = [窗口始, 窗口末, 目标StateId]</summary>
     bool CheckConfig(float[] config)
     {
         if (config == null || config.Length < 2) return false;
-        float t = GetNormalizedTime();
-        return (t >= 0f && t <= config[0]) || t >= config[1];
+        return CheckWindow(config[0], config[1]);
     }
 
-    float GetNormalizedTime()
+    public float GetNormalizedTime()
     {
         if (animator == null) return 0f;
         // CrossFade 过渡期间，当前状态还是旧动画，取下一个状态的时间
@@ -231,13 +242,29 @@ public class CharacterState : MonoBehaviour
         return stateInfo.normalizedTime % 1f;
     }
 
+    /// <summary>当前动画片段长度（秒），CrossFade 期间取下一段。供各服务换算秒→归一化时间。</summary>
+    public float GetClipLength()
+    {
+        if (animator == null) return 1f;
+        var info = animator.IsInTransition(0) ? animator.GetNextAnimatorStateInfo(0) : animator.GetCurrentAnimatorStateInfo(0);
+        float len = info.length;
+        return len <= 0.001f ? 1f : len;
+    }
+
     void OnAtk()
     {
-        if (InputSystemController.Instance.GetAttackPressed())
+        if (!InputSystemController.Instance.GetAttackPressed()) return;
+        var arr = CurrentState.Config.OnAtk;
+        if (arr == null) return;
+
+        // flat 数组，每 3 个一组 [窗口始, 窗口末, 目标StateId]，按顺序第一个命中的生效
+        // 例：0.3;0.5;10022;0.6;1.0;10021 → 命中窗口接攻击2；错过窗口后摇再按 → 回攻击1
+        for (int i = 0; i + 2 < arr.Length; i += 3)
         {
-            if (CheckConfig(CurrentState.Config.OnAtk))
+            if (CheckWindow(arr[i], arr[i + 1]))
             {
-                ToNext((int)CurrentState.Config.OnAtk[2]);
+                ToNext((int)arr[i + 2]);
+                return;
             }
         }
     }
@@ -281,7 +308,7 @@ public class CharacterState : MonoBehaviour
     }
 
     /// <summary>
-    /// 强化技能检测：`OnEnhanceSkill` 格式 [离场状态, 进场状态]。
+    /// 强化技能检测：`OnEnhanceSkill` 格式 [离场状态, 进场状态]（不是时间窗口，不套 CheckConfig）。
     /// 强化期是否可用由子类 `CanUseEnhanceSkill()` 决定。
     /// </summary>
     void OnEnhanceSkillCheck()
@@ -290,7 +317,6 @@ public class CharacterState : MonoBehaviour
         if (!CanUseEnhanceSkill()) return;
         var cfg = CurrentState.Config;
         if (cfg.OnEnhanceSkill == null || cfg.OnEnhanceSkill.Length < 2) return;
-        if (!CheckConfig(cfg.OnEnhanceSkill)) return;
 
         int leaveState = (int)cfg.OnEnhanceSkill[0];
         int enterState = (int)cfg.OnEnhanceSkill[1];
@@ -463,41 +489,6 @@ public class CharacterState : MonoBehaviour
         }
     }
 
-    // ═══════ 武器显隐 ═══════
-
-    void OnWeaponBegin()
-    {
-        if (!weaponDict.TryGetValue(CurrentState.Id, out var data)) return;
-        foreach (var w in data.weapons)
-        {
-            var t = string.IsNullOrEmpty(w.weaponPath) ? null : transform.Find(w.weaponPath);
-            if (t != null) t.gameObject.SetActive(false);
-        }
-    }
-
-    void OnWeaponUpdate()
-    {
-        if (!weaponDict.TryGetValue(CurrentState.Id, out var data)) return;
-        float t = GetNormalizedTime();
-        float clipLen = animator.GetCurrentAnimatorStateInfo(0).length;
-        if (clipLen <= 0.001f) clipLen = 1f;
-
-        foreach (var w in data.weapons)
-        {
-            if (!w.enabled) continue;
-            var tr = string.IsNullOrEmpty(w.weaponPath) ? null : transform.Find(w.weaponPath);
-            if (tr == null) continue;
-
-            float showNorm = w.showSec / clipLen;
-            float hideNorm = w.hideSec / clipLen;
-
-            if (t >= showNorm && t < hideNorm)
-                tr.gameObject.SetActive(true);
-            else if (t >= hideNorm)
-                tr.gameObject.SetActive(false);
-        }
-    }
-
     // ═══════ 相机镜头 ═══════
 
     void OnCameraBegin()
@@ -577,13 +568,18 @@ public class CharacterState : MonoBehaviour
     public bool ToNext(int stateId)
     {
         if (!stateData.TryGetValue(stateId, out var next)) return false;
-        if (CurrentState != null) DOStateEvent(CurrentState.Id, StateEventType.End);
+        if (CurrentState != null)
+        {
+            DOStateEvent(CurrentState.Id, StateEventType.End);            // 旧状态 End 事件
+            for (int i = 0; i < services.Count; i++) services[i].OnEnd(); // 旧状态服务清理
+        }
 
         CurrentState = next;
         CurrentState.SetBeginTime();
         animEndFired = false;
         animator.CrossFade(CurrentState.Config.AnimName, 0.016f);
-        DOStateEvent(CurrentState.Id, StateEventType.Begin);
+        DOStateEvent(CurrentState.Id, StateEventType.Begin);              // 新状态 Begin 事件
+        for (int i = 0; i < services.Count; i++) services[i].OnBegin();   // 新状态服务初始化
         OnStateBegin(CurrentState);
         EventBus.Publish(new StateChangedEvent(CurrentState.Id, cameraSO)); // 通知相机切镜头
         return true;
@@ -613,5 +609,107 @@ public class CharacterState : MonoBehaviour
             if (dict.TryGetValue(type, out var list))
                 for (int i = 0; i < list.Count; i++)
                     list[i].Invoke();
+    }
+
+    // ═══════ 命中范围可视化（Scene 视图） ═══════
+
+    /// <summary>
+    /// Scene 视图画出命中扇形/球形范围，方便调角度和距离。
+    /// 编辑模式预览 gizmoPreviewStateId；Play 模式实时画当前状态的命中段。
+    /// </summary>
+    void OnDrawGizmos()
+    {
+        if (hitSO == null) return;
+
+        // 运行时画当前状态，编辑时画预览状态
+        int id = Application.isPlaying && CurrentState != null ? CurrentState.Id : gizmoPreviewStateId;
+
+        StateHitData data = null;
+        for (int i = 0; i < hitSO.states.Count; i++)
+            if (hitSO.states[i].StateId == id) { data = hitSO.states[i]; break; }
+        if (data == null) return;
+
+        foreach (var seg in data.segments)
+        {
+            if (!seg.enabled) continue;
+            // Play 模式只画"正在判定的窗口"，窗口结束框消失；编辑模式常亮预览
+            if (Application.isPlaying && !IsHitWindowActive(seg)) continue;
+
+            Vector3 center = transform.position + transform.rotation * seg.offset;
+            Gizmos.color = Color.red;
+
+            if (seg.shape == HitShape.Sphere)
+            {
+                Gizmos.DrawWireSphere(center, seg.radius);
+                continue;
+            }
+
+            if (seg.shape == HitShape.Line)
+            {
+                // 线形：平头圆柱（中心线 + 两端平头圆 + 侧边线）
+                Vector3 ldir = transform.rotation * Quaternion.Euler(seg.pitchOffset, seg.yawOffset, 0f) * Vector3.forward;
+                Vector3 end = center + ldir * seg.lineLength;
+                DrawWireCylinder(center, end, seg.lineWidth);
+                continue;
+            }
+
+            // 扇形：两条边线 + 弧线
+            Vector3 fwd = Quaternion.Euler(seg.pitchOffset, seg.yawOffset, 0f) * transform.forward;
+            Vector3 left = Quaternion.Euler(0f, -seg.halfAngle, 0f) * fwd;
+            Vector3 right = Quaternion.Euler(0f, seg.halfAngle, 0f) * fwd;
+            Gizmos.DrawLine(center, center + left * seg.radius);
+            Gizmos.DrawLine(center, center + right * seg.radius);
+
+            const int steps = 24;
+            Vector3 prev = center + left * seg.radius;
+            for (int i = 1; i <= steps; i++)
+            {
+                float ang = Mathf.Lerp(-seg.halfAngle, seg.halfAngle, (float)i / steps);
+                Vector3 dir = Quaternion.Euler(0f, seg.yawOffset + ang, 0f) * transform.forward;
+                Vector3 cur = center + dir * seg.radius;
+                Gizmos.DrawLine(prev, cur);
+                prev = cur;
+            }
+        }
+    }
+
+    /// <summary>当前动画时间是否处于该段的命中窗口内（Play 模式控制检测框显隐）</summary>
+    bool IsHitWindowActive(HitSegment seg)
+    {
+        float sec = GetNormalizedTime() * GetClipLength();
+        return sec >= seg.triggerSec && sec < seg.triggerSec + seg.duration;
+    }
+
+    /// <summary>画平头圆柱：中心线 + 两端平头圆 + 4 条侧边线</summary>
+    static void DrawWireCylinder(Vector3 start, Vector3 end, float radius)
+    {
+        Vector3 dir = (end - start).normalized;
+        if (dir.sqrMagnitude < 0.0001f) return;
+
+        // 垂直于 dir 的两个正交方向
+        Vector3 perp = Vector3.Cross(dir, Mathf.Abs(dir.y) < 0.99f ? Vector3.up : Vector3.right).normalized;
+        Vector3 perp2 = Vector3.Cross(dir, perp).normalized;
+
+        // 中心线
+        Gizmos.DrawLine(start, end);
+
+        // 两端平头圆 + 侧边线
+        const int segs = 24;
+        Vector3 prevStart = start + perp * radius;
+        Vector3 prevEnd = end + perp * radius;
+        for (int i = 1; i <= segs; i++)
+        {
+            float a = (float)i / segs * Mathf.PI * 2f;
+            Vector3 offset = (Mathf.Cos(a) * perp + Mathf.Sin(a) * perp2) * radius;
+            Vector3 curStart = start + offset;
+            Vector3 curEnd = end + offset;
+            Gizmos.DrawLine(prevStart, curStart);
+            Gizmos.DrawLine(prevEnd, curEnd);
+            // 每 90° 画一条侧边线
+            if (i % (segs / 4) == 0)
+                Gizmos.DrawLine(curStart, curEnd);
+            prevStart = curStart;
+            prevEnd = curEnd;
+        }
     }
 }
