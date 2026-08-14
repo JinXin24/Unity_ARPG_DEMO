@@ -7,12 +7,12 @@ using UnityEngine;
 /// 配置来源：AIConfig.xlsx 导出的 List SO。
 ///   ai_state 表：状态定义（StateId → AnimName）
 ///   ai_transition 表：状态迁移（From/To/Condition/Param/Order，From=0 全局）
-/// 移动方式：AC 里 Walking 状态内置 1D Blend Tree（参数 Speed：0=待机、1=走），
+/// 移动方式：AC 里 Moving 状态内置 1D Blend Tree（参数 Speed：0=待机、1=走、2=跑），
 ///   代码用 Mathf.SmoothDamp 平滑驱动 Speed，起步/停步自然加减速。
 /// 待机设计：独立 Idle 状态 = 大脑决策节点；Walking 混合树保留 Speed=0 待机节点 = 视觉减速锚点。
 /// 停止方式（玩家同款）：到位只翻 targetSpeed，身体始终跟着衰减的 Speed 滑行减速，
 ///   Speed≈0 时 Arrive 迁移切 Idle —— 身体和动画同步减速、脚不离地（允许偏离巡逻点一段刹车距离）。
-/// 巡逻流程：Walking 走向 patrolPoints[patrolIndex] → 到位 → 滑行刹车 → Speed≈0 → Arrive 迁移 → Idle
+/// 巡逻流程：Moving(blendSpeed=1 走速) 走向 patrolPoints[patrolIndex] → 到位 → 滑行刹车 → Speed≈0 → Arrive 迁移 → Idle
 ///   → Timer 停留 N 秒（Param[0]）→ 迁移回 Walking → 下一个巡逻点。
 /// </summary>
 public class EnemyController : MonoBehaviour
@@ -30,9 +30,18 @@ public class EnemyController : MonoBehaviour
     [Header("状态ID（对应 ai_state 表 StateId）")]
     [SerializeField] private int idleStateId = 2001;      // 待机（Timer 基准 / 巡逻循环锚点）
     [SerializeField] private int walkStateId = 2002;      // 巡逻/走路
+    [SerializeField] private int chaseStateId = 2003;     // 战斗追击（移动目标=玩家）
+    [SerializeField] private int attackStateId = 2004;    // 攻击（进入时一次性转正，攻击期间锁定方向）
 
-    [Header("巡逻（占位，待寻路）")]
-    [SerializeField] private Transform[] patrolPoints;    // 巡逻点
+    [Header("调试：运行时强制切换状态")]
+    [SerializeField] private int debugForceStateId;       // 填 StateId，数值一改就强切（不经过迁移表）
+    private int lastForceStateId;                         // 记录上次值，只在变化时强切
+
+    [Header("追逐")]
+    [SerializeField] private Transform chaseTarget;       // 追逐目标（拖玩家），chaseStateId 生效时追它
+
+    [Header("巡逻（父物体下子物体按顺序 = 巡逻点）")]
+    [SerializeField] private Transform patrolRoot;        // 巡逻路径父物体（子物体顺序 = 起点→…→终点）
     [SerializeField] private AIMotionSO motionSO;         // 各状态位移配置（取 moveSpeed 作全速基准）
     [SerializeField] private float turnSpeed = 360f;      // 转身速度(度/秒)
 
@@ -49,7 +58,9 @@ public class EnemyController : MonoBehaviour
     private readonly Dictionary<int, AIMotionData> motionDict = new();     // StateId → 位移配置
     private readonly Dictionary<int, List<AiTransitionSO>> transitionMap = new(); // From → 按 Order 排序的迁移
     private int currentStateId;
+    private Transform[] patrolPoints;                      // 运行时缓存：patrolRoot 子物体（Start 收集）
     private int patrolIndex;
+    private int patrolDir = 1;                             // 巡逻方向：+1 正向（起点→终点），-1 反向（终点→起点）
     private bool arrived;                                  // 已到位（刹车中），等 Speed≈0 切待机
     private float idleEnterTime;                           // 进入待机的时间（Timer 条件基准）
 
@@ -57,6 +68,7 @@ public class EnemyController : MonoBehaviour
 
     void Start()
     {
+        BuildPatrolPoints();
         BuildStateData();
         if (stateData.Count == 0)
         {
@@ -66,11 +78,36 @@ public class EnemyController : MonoBehaviour
         EnterState(stateData.ContainsKey(initialStateId) ? initialStateId : FirstStateId());
     }
 
+    /// <summary>从 patrolRoot 子物体按顺序收集巡逻点（起点→…→终点）</summary>
+    void BuildPatrolPoints()
+    {
+        if (patrolRoot == null) { patrolPoints = new Transform[0]; return; }
+        patrolPoints = new Transform[patrolRoot.childCount];
+        for (int i = 0; i < patrolRoot.childCount; i++)
+            patrolPoints[i] = patrolRoot.GetChild(i);
+    }
+
     void Update()
     {
+        DebugForceSwitch();   // 调试：Inspector 强切（不经过迁移表）
         if (CurrentState == null || animator == null) return;
         UpdateMovement();
         CheckTransitions();
+    }
+
+    /// <summary>
+    /// 调试：Inspector 里改 debugForceStateId → 强切到该状态（绕过迁移表）。
+    /// 用法：Play 模式下在 Inspector 填要测试的 StateId，数值一改立即生效；填回 0 恢复由迁移表驱动。
+    /// </summary>
+    void DebugForceSwitch()
+    {
+        if (debugForceStateId == lastForceStateId) return;
+        lastForceStateId = debugForceStateId;
+        if (debugForceStateId > 0)
+        {
+            Debug.Log($"[Enemy] 调试强切 → StateId={debugForceStateId}");
+            EnterState(debugForceStateId);
+        }
     }
 
     /// <summary>按 EnemyId 构建 state / motion / transition 数据</summary>
@@ -136,9 +173,26 @@ public class EnemyController : MonoBehaviour
         int prevId = currentStateId;
         currentStateId = stateId;
 
-        // 待机结束 → 走向下一个巡逻点
-        if (stateId == walkStateId && prevId == idleStateId && patrolPoints != null && patrolPoints.Length > 0)
-            patrolIndex = (patrolIndex + 1) % patrolPoints.Length;
+        // 进入攻击 → 一次性转正面对玩家（攻击期间锁定方向，让玩家能走位躲技能）
+        if (stateId == attackStateId && chaseTarget != null)
+        {
+            var dir = chaseTarget.position - transform.position;
+            dir.y = 0;
+            if (dir.sqrMagnitude > 0.0001f)
+                transform.rotation = Quaternion.LookRotation(dir.normalized);
+        }
+
+        // 待机结束 → 走向下一个巡逻点（乒乓折返：走到终点反向、走到起点再反向）
+        if (stateId == walkStateId && prevId == idleStateId && patrolPoints != null && patrolPoints.Length > 1)
+        {
+            int next = patrolIndex + patrolDir;
+            if (next >= patrolPoints.Length || next < 0)   // 撞到终点或起点 → 反转方向
+            {
+                patrolDir = -patrolDir;
+                next = patrolIndex + patrolDir;
+            }
+            patrolIndex = next;
+        }
 
         animator.CrossFade(s.AnimName, crossFadeTime);
 
@@ -150,26 +204,48 @@ public class EnemyController : MonoBehaviour
 
     // ═══════ 移动（按当前状态是否有位移配置决定走/停） ═══════
 
+    /// <summary>移动目标：追逐状态追玩家，否则走巡逻点；没有目标返回 null（原地停）。</summary>
+    Transform GetMoveTarget()
+    {
+        if (currentStateId == chaseStateId && chaseTarget != null)
+            return chaseTarget;                                     // 追击 → 追玩家（持续转身跟踪）
+        if (currentStateId == attackStateId)
+            return null;                                            // 攻击 → 不追踪（进入时已转正，攻击期间锁定方向）
+        if (patrolPoints != null && patrolPoints.Length > 0)
+            return patrolPoints[patrolIndex];                        // 巡逻 → 走点
+        return null;                                                 // 无目标 → 原地停
+    }
+
     void UpdateMovement()
     {
         var motion = GetMotion();
-        if (motion == null || patrolPoints == null || patrolPoints.Length == 0)
+        if (motion == null)
         {
-            targetSpeed = 0f;   // 无位移配置（待机/攻击等）或没巡逻点 → 原地停
+            targetSpeed = 0f;   // 无位移配置（待机/攻击等）→ 原地停（攻击态进入时已转正，这里锁死方向）
             ApplySpeed();
             return;
         }
 
-        var target = patrolPoints[patrolIndex];
+        var target = GetMoveTarget();
+        if (target == null)
+        {
+            targetSpeed = 0f;   // 没有移动目标 → 原地停
+            ApplySpeed();
+            return;
+        }
+
         var dir = target.position - transform.position;
         dir.y = 0;
         float dist = dir.magnitude;
 
-        // 到位判定：只翻 targetSpeed（走→停），不冻结身体
-        if (!arrived && dist <= motion.arriveDist)
+        // 到位判定：只翻 targetSpeed（走→停），不冻结身体。
+        // 追逐：动态追踪（玩家离远重新追、够近才停）；巡逻：一次性到位（停下后靠迁移切走）。
+        if (currentStateId == chaseStateId)
+            arrived = dist <= motion.chaseStopDist;
+        else if (!arrived && dist <= motion.arriveDist)
             arrived = true;
 
-        targetSpeed = arrived ? 0f : 1f;
+        targetSpeed = arrived ? 0f : motion.blendSpeed;   // Moving 混合树档位：0=停 1=走 2=跑
 
         // 身体位移 = 全速基准 × 当前 Speed —— 玩家同款：身体跟着平滑衰减的 Speed 滑行减速，
         // 脚不离地。允许偏离巡逻点一段刹车距离（不需要精确到位）。
@@ -178,7 +254,7 @@ public class EnemyController : MonoBehaviour
         {
             transform.position += dir.normalized * speed * Time.deltaTime;
 
-            // 转身：匀速向目标朝向旋转（RotateTowards 固定角速度）
+            // 转身：只在移动时转向目标，停下就锁定朝向（玩家围着转圈时不跟着原地打转）
             if (dir.sqrMagnitude > 0.0001f)
             {
                 var targetRot = Quaternion.LookRotation(dir.normalized);
@@ -213,14 +289,28 @@ public class EnemyController : MonoBehaviour
     }
 
     /// <summary>
-    /// 迁移条件（对应 ai_transition 表 Condition 列）：
+    /// 迁移条件（对应 ai_transition 表 Condition 列，多个用分号分隔表示 AND）：
     ///   Timer = 停留 Param[0] 秒（在待机状态计时）
     ///   Arrive = 到位且停稳（等 Speed 归零，避免走路姿势直接跳待机）
     ///   OnAnimEnd = 动画播完
+    ///   HasTarget = 已锁定目标（追击/攻击玩家）
+    ///   NoTarget = 无锁定目标（走巡逻）
+    /// 例："Timer;HasTarget" = 停留够 5 秒 且 有玩家目标才追击。
     /// </summary>
     bool CheckCondition(AiTransitionSO t)
     {
-        switch (t.Condition)
+        if (string.IsNullOrEmpty(t.Condition)) return false;
+        foreach (var cond in t.Condition.Split(';'))
+        {
+            if (!CheckSingleCondition(cond.Trim(), t)) return false;
+        }
+        return true;
+    }
+
+    /// <summary>单个迁移条件判断（Condition 拆分后的每一项）</summary>
+    bool CheckSingleCondition(string cond, AiTransitionSO t)
+    {
+        switch (cond)
         {
             case "Timer":
                 float wait = t.Param != null && t.Param.Length > 0 ? t.Param[0] : 2f;
@@ -232,6 +322,12 @@ public class EnemyController : MonoBehaviour
             case "OnAnimEnd":
                 if (animator.IsInTransition(0)) return false;
                 return animator.GetCurrentAnimatorStateInfo(0).normalizedTime >= 1f;
+
+            case "HasTarget":
+                return chaseTarget != null;
+
+            case "NoTarget":
+                return chaseTarget == null;
 
             default:
                 return false;

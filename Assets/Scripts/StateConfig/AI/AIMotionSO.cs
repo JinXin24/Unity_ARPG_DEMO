@@ -19,6 +19,9 @@ public class AIMotionData
     [Header("全速基准 (m/s)")]
     public float moveSpeed = 1.0f;
 
+    [Header("目标 Speed 参数（Moving 混合树档位：0=待机 1=走 2=跑）")]
+    public float blendSpeed = 1.0f;
+
     [Header("速度剖面曲线：横轴=动画归一化时间(0~1)，纵轴=速度倍率(0停→1全速)")]
     public AnimationCurve speedCurve = new AnimationCurve(
         new Keyframe(0f, 1f),
@@ -29,6 +32,9 @@ public class AIMotionData
 
     [Header("到位判定距离 (米)")]
     public float arriveDist = 0.5f;
+
+    [Header("追逐停止距离：追到离玩家多近停下 (米)")]
+    public float chaseStopDist = 1.5f;
 }
 
 /// <summary>

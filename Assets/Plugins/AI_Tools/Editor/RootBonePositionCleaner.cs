@@ -358,8 +358,7 @@ public class RootBonePositionCleaner : EditorWindow
     }
 
     /// <summary>缩放指定骨骼的 Position 曲线，可选择缩放哪些轴</summary>
-    public static int ScaleBonePosition(AnimationClip clip, string bonePath, bool scaleX = true, bool scaleY = true, bool scaleZ = true, float factor = 0.5f)
-    {
+    public static int ScaleBonePosition(AnimationClip clip, string bonePath, bool scaleX = true, bool scaleY = true, bool scaleZ = true, float factor = 0.5f)    {
         int scaled = 0;
         foreach (var binding in AnimationUtility.GetCurveBindings(clip))
         {

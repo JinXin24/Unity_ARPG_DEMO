@@ -187,7 +187,10 @@ public class CameraController : MonoBehaviour, IEventReceiver<FormSwitchedEvent>
         // 2.5 球体投射碰撞：碰墙秒缩，恢复靠 SmoothDamp
         Quaternion rot = Quaternion.Euler(pitch, yaw, 0);
         Vector3 camDir = rot * Vector3.back; // (0,0,-1) 转到世界方向
-        if (Physics.SphereCast(smoothPivot, sphereRadius, camDir, out RaycastHit hit, armLength + sphereRadius, collisionMask))
+        // 探测距离用 desiredArmLength（目标臂长）而非当前 armLength：
+        // 用被压缩后的 armLength 探测，贴地时探测距离刚好卡在障碍物距离附近，
+        // 「缩→探测不到→SmoothDamp 追长→又碰到→猛缩」循环，造成不停抖动。
+        if (Physics.SphereCast(smoothPivot, sphereRadius, camDir, out RaycastHit hit, desiredArmLength + sphereRadius, collisionMask))
         {
             float safeDist = Mathf.Max(hit.distance - sphereRadius - collisionOffset, 0f);
             armLength = Mathf.Min(armLength, safeDist);
