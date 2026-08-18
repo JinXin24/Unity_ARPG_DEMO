@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using JinXinFramework.Event;
 
 /// <summary>
 /// 敌人控制器 — 数据驱动状态机（读 AIConfig 的 ai_state + ai_transition 表）。
@@ -15,7 +16,7 @@ using UnityEngine;
 /// 巡逻流程：Moving(blendSpeed=1 走速) 走向 patrolPoints[patrolIndex] → 到位 → 滑行刹车 → Speed≈0 → Arrive 迁移 → Idle
 ///   → Timer 停留 N 秒（Param[0]）→ 迁移回 Walking → 下一个巡逻点。
 /// </summary>
-public class EnemyController : MonoBehaviour
+public class EnemyController : MonoBehaviour, IEventReceiver<DamageEvent>, IEventReceiver<DeathEvent>
 {
     [Header("引用")]
     [SerializeField] private Animator animator;                    // 敌人 Animator（挂子物体）
@@ -32,13 +33,15 @@ public class EnemyController : MonoBehaviour
     [SerializeField] private int walkStateId = 2002;      // 巡逻/走路
     [SerializeField] private int chaseStateId = 2003;     // 战斗追击（移动目标=玩家）
     [SerializeField] private int attackStateId = 2004;    // 攻击（进入时一次性转正，攻击期间锁定方向）
+    [SerializeField] private int hitStateId = 2005;       // 受击（被打进入，播完按 HasTarget 切追击/待机）
+    [SerializeField] private int deathStateId = 2006;     // 死亡（全局迁移 Dead 条件进入，终态不再切走）
 
     [Header("调试：运行时强制切换状态")]
     [SerializeField] private int debugForceStateId;       // 填 StateId，数值一改就强切（不经过迁移表）
     private int lastForceStateId;                         // 记录上次值，只在变化时强切
 
-    [Header("追逐")]
-    [SerializeField] private Transform chaseTarget;       // 追逐目标（拖玩家），chaseStateId 生效时追它
+    [Header("感知")]
+    [SerializeField] private EnemyPerception perception;  // 感知组件（自动检测玩家，替代手动拖目标）
 
     [Header("巡逻（父物体下子物体按顺序 = 巡逻点）")]
     [SerializeField] private Transform patrolRoot;        // 巡逻路径父物体（子物体顺序 = 起点→…→终点）
@@ -58,16 +61,49 @@ public class EnemyController : MonoBehaviour
     private readonly Dictionary<int, AIMotionData> motionDict = new();     // StateId → 位移配置
     private readonly Dictionary<int, List<AiTransitionSO>> transitionMap = new(); // From → 按 Order 排序的迁移
     private int currentStateId;
+    private Transform chaseTarget;                         // 运行时追击目标（从 perception.CurrentTarget 同步）
     private Transform[] patrolPoints;                      // 运行时缓存：patrolRoot 子物体（Start 收集）
     private int patrolIndex;
     private int patrolDir = 1;                             // 巡逻方向：+1 正向（起点→终点），-1 反向（终点→起点）
     private bool arrived;                                  // 已到位（刹车中），等 Speed≈0 切待机
+    private bool isDead;                                   // 死亡标记（DeathEvent 置位，Dead 条件驱动切死亡态）
     private float idleEnterTime;                           // 进入待机的时间（Timer 条件基准）
+    private int stateEnterFrame;                           // 进入状态时的帧号（OnAnimEnd 防读上一状态的进度）
 
     AiStateSO CurrentState => stateData.TryGetValue(currentStateId, out var s) ? s : null;
 
+    void OnEnable()
+    {
+        EventBus.Subscribe<DamageEvent>(this);
+        EventBus.Subscribe<DeathEvent>(this);
+    }
+
+    void OnDisable()
+    {
+        EventBus.Unsubscribe<DamageEvent>(this);
+        EventBus.Unsubscribe<DeathEvent>(this);
+    }
+
+    /// <summary>被打中 → 硬切受击状态（打断当前任何状态），每次命中都重新播受击动画。已死则跳过（致命一击直接走死亡迁移）。</summary>
+    public void OnEvent(DamageEvent evt)
+    {
+        if (evt.Target == null || evt.Target.gameObject != gameObject) return;   // 只响应自己身上的伤害
+        if (evt.Target.IsDead) return;   // 已死 → 不播受击，让全局 Dead 迁移接管切死亡态
+        Debug.Log($"[受击] {name} 命中，当前状态={currentStateId} → 切受击 {hitStateId}");
+        EnterState(hitStateId);
+    }
+
+    /// <summary>死亡事件（血量归零首次触发）→ 置死亡标记，下一帧由全局 Dead 迁移切死亡态。</summary>
+    public void OnEvent(DeathEvent evt)
+    {
+        if (evt.Target == null || evt.Target.gameObject != gameObject) return;   // 只响应自己
+        isDead = true;
+        Debug.Log($"[死亡] {name} 血量归零，置死亡标记（迁移表 Dead 条件接管）");
+    }
+
     void Start()
     {
+        if (perception == null) perception = GetComponent<EnemyPerception>();   // 兜底：同物体上挂了感知组件就自动找到，不用手动拖
         BuildPatrolPoints();
         BuildStateData();
         if (stateData.Count == 0)
@@ -91,8 +127,15 @@ public class EnemyController : MonoBehaviour
     {
         DebugForceSwitch();   // 调试：Inspector 强切（不经过迁移表）
         if (CurrentState == null || animator == null) return;
+        UpdatePerception();   // 感知同步：chaseTarget 跟随感知结果
         UpdateMovement();
         CheckTransitions();
+    }
+
+    /// <summary>把感知结果同步到 chaseTarget（感知到玩家 → 追击目标；丢失 → null）</summary>
+    void UpdatePerception()
+    {
+        chaseTarget = perception != null ? perception.CurrentTarget : null;
     }
 
     /// <summary>
@@ -169,9 +212,11 @@ public class EnemyController : MonoBehaviour
     /// <summary>进入状态：CrossFade + 各状态专属进入逻辑</summary>
     void EnterState(int stateId)
     {
-        if (!stateData.TryGetValue(stateId, out var s)) return;
+        if (!stateData.TryGetValue(stateId, out var s)) { Debug.LogWarning($"[Enemy] {name} 状态 {stateId} 不在 stateData（表没导出？）"); return; }
         int prevId = currentStateId;
         currentStateId = stateId;
+        stateEnterFrame = Time.frameCount;   // OnAnimEnd 基准：进入当帧 CrossFade 还没生效，禁止判动画结束
+        Debug.Log($"[Enemy] {name} 进入状态 {stateId}（{s.AnimName}）");
 
         // 进入攻击 → 一次性转正面对玩家（攻击期间锁定方向，让玩家能走位躲技能）
         if (stateId == attackStateId && chaseTarget != null)
@@ -194,7 +239,7 @@ public class EnemyController : MonoBehaviour
             patrolIndex = next;
         }
 
-        animator.CrossFade(s.AnimName, crossFadeTime);
+        animator.CrossFade(s.AnimName, crossFadeTime, 0, 0f);   // normalizedTimeOffset=0：强制从头播（否则同状态重进会从当前位置继续，不重播）
 
         if (stateId == idleStateId)
             idleEnterTime = Time.time;   // Timer 条件基准
@@ -295,6 +340,7 @@ public class EnemyController : MonoBehaviour
     ///   OnAnimEnd = 动画播完
     ///   HasTarget = 已锁定目标（追击/攻击玩家）
     ///   NoTarget = 无锁定目标（走巡逻）
+    ///   Dead = 已死亡（DeathEvent 置位，配合 From=0 全局迁移：任意状态血归零立即切死亡态）
     /// 例："Timer;HasTarget" = 停留够 5 秒 且 有玩家目标才追击。
     /// </summary>
     bool CheckCondition(AiTransitionSO t)
@@ -321,6 +367,9 @@ public class EnemyController : MonoBehaviour
 
             case "OnAnimEnd":
                 if (animator.IsInTransition(0)) return false;
+                // 刚进入的前几帧 CrossFade 未生效，GetCurrentAnimatorStateInfo 读到的还是上一状态
+                // （循环状态 normalizedTime 恒 ≥1），会把 OnAnimEnd 当帧误判成真，受击/攻击动画被跳过
+                if (Time.frameCount - stateEnterFrame < 2) return false;
                 return animator.GetCurrentAnimatorStateInfo(0).normalizedTime >= 1f;
 
             case "HasTarget":
@@ -328,6 +377,10 @@ public class EnemyController : MonoBehaviour
 
             case "NoTarget":
                 return chaseTarget == null;
+
+            case "Dead":
+                // 已死 → 切死亡态；已在死亡态 → 排除（防止全局迁移每帧重复重播死亡动画）
+                return isDead && currentStateId != deathStateId;
 
             default:
                 return false;

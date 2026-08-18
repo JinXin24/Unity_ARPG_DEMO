@@ -20,13 +20,17 @@ public class CharacterState : MonoBehaviour
     [SerializeField] private StateMotionSO motionSO;
     [SerializeField] private StateEffectSO effectSO;
     [SerializeField] private StateWeaponSO weaponSO;
+    [SerializeField] private StateWeaponThrowSO weaponThrowSO;
     [SerializeField] private StateHitSO hitSO;
+    [SerializeField] private int characterId = 1001;   // 对应 CharacterManager 角色ID，攻击结算取攻击方数值
     [SerializeField] private MoveConfigSO moveConfig;
     [SerializeField] protected CameraStateSO cameraSO;
+    [SerializeField] private LockOnController lockOnController;   // 锁敌组件（同物体自动找，可拖可自动）
 
     // 调试：Scene 视图预览命中扇形/球形用的状态ID
     [Header("调试")]
     [SerializeField] private int gizmoPreviewStateId = 10021;
+    [SerializeField] private int weaponThrowPreviewStateId = 20021;   // Scene 视图预览武器投掷悬停点用的状态ID
 
     public PlayerState CurrentState { get; private set; }
     private Dictionary<int, PlayerState> stateData = new();
@@ -42,13 +46,17 @@ public class CharacterState : MonoBehaviour
     private float rotationVelocity;
     private const float RotationSmoothTime = 0.025f;
 
+    // 锁定攻击转向 — 攻击起手朝锁定敌人快速转身，转到位自动清除
+    private Transform faceTarget;
+    private const float FaceTurnSmoothTime = 0.05f;
+
     // 位移 — 参照 Demo_3D_RPG_ PhysicsService
     private Dictionary<int, StateMotionData> motionDict;
     private Dictionary<int, HashSet<int>> physicsExecuted = new(); // stateId → executed config indices
     private PhysicsConfig activePhysics;
     private Vector3 activePhysicsVelocity;
-    private float activePhysicsTriggerNorm;
-    private float activePhysicsTimeNorm;
+    private float activePhysicsTriggerSec;
+    private float activePhysicsTimeSec;
     private bool animEndFired;
 
     // 特效
@@ -60,6 +68,7 @@ public class CharacterState : MonoBehaviour
     private readonly List<FSMServiceBase> services = new();
     private WeaponVisibleService weaponService;
     private HitDetectorService hitService;
+    private WeaponThrowService weaponThrowService;
 
     // 相机镜头
     private Dictionary<int, CameraStateData> cameraDict;
@@ -71,6 +80,9 @@ public class CharacterState : MonoBehaviour
             characterController = GetComponentInChildren<CharacterController>();
         if (characterController == null)
             Debug.LogWarning($"[CharacterState] {name} 没有 CharacterController，位移不会生效");
+
+        if (lockOnController == null)
+            lockOnController = GetComponent<LockOnController>();   // 同物体上挂了锁敌组件就自动找到，不用手动拖
 
         // 构建位移配置字典（StateId → StateMotionData）
         if (motionSO != null)
@@ -103,6 +115,12 @@ public class CharacterState : MonoBehaviour
         hitService.SetOwner(this);
         hitService.Init();
         services.Add(hitService);
+
+        // 服务层：武器投掷服务（triggerSec 触发，飞出→自转→飞回，命中可选）
+        weaponThrowService = new WeaponThrowService(weaponThrowSO);
+        weaponThrowService.SetOwner(this);
+        weaponThrowService.Init();
+        services.Add(weaponThrowService);
 
         // 构建相机镜头字典
         if (cameraSO != null)
@@ -185,6 +203,7 @@ public class CharacterState : MonoBehaviour
 
         // 旋转 — 参照 Demo_3D_RPG_ DORotate：面向输入方向（相对相机）
         DORotate();
+        UpdateLockFace();   // 锁定攻击转向（优先级高于走路转身，覆盖上一行结果）
 
         // 移动：Blend Tree Speed → 世界位移速度（按状态区分）
         if (moveConfig != null && characterController != null && currentSpeed > 0.01f)
@@ -192,6 +211,10 @@ public class CharacterState : MonoBehaviour
             float worldSpeed = moveConfig.GetMoveSpeed(CurrentState.Id, currentSpeed);
             characterController.Move(transform.forward * worldSpeed * Time.deltaTime);
         }
+
+
+
+
 
         // 动画播完检测（用原始 normalizedTime，不用 %1f 的版本）
         if (!animEndFired && !animator.IsInTransition(0))
@@ -251,6 +274,23 @@ public class CharacterState : MonoBehaviour
         return len <= 0.001f ? 1f : len;
     }
 
+    /// <summary>
+    /// 进入当前状态后的真实流逝秒（相对动画开头）。窗口/触发判定统一用它，别用 GetNormalizedTime：
+    /// 进入状态的当帧 CrossFade 未生效，normalizedTime 读到的是上一状态的进度（旧状态长 clip 时值很大），
+    /// 会把 triggerSec 窗口一次性打穿。BeginTime 在 ToNext 里 SetBeginTime() 刷新。
+    /// </summary>
+    public float GetStateElapsed()
+    {
+        return CurrentState != null ? Time.time - CurrentState.BeginTime : 0f;
+    }
+
+    /// <summary>攻击方数值快照（攻击结算用），CharacterManager 没挂则返回 null</summary>
+    public CharacterStats GetStats()
+    {
+        if (CharacterManager.Instance == null) return null;
+        return CharacterManager.Instance.GetStats(characterId);
+    }
+
     void OnAtk()
     {
         if (!InputSystemController.Instance.GetAttackPressed()) return;
@@ -263,6 +303,10 @@ public class CharacterState : MonoBehaviour
         {
             if (CheckWindow(arr[i], arr[i + 1]))
             {
+                // 锁定敌人时：攻击起手自动转向锁定目标（每次攻击都转）
+                if (lockOnController != null && lockOnController.IsLocked)
+                    faceTarget = lockOnController.LockedTarget;
+
                 ToNext((int)arr[i + 2]);
                 return;
             }
@@ -340,8 +384,8 @@ public class CharacterState : MonoBehaviour
         if (!physicsExecuted.ContainsKey(id)) physicsExecuted[id] = new HashSet<int>();
         else physicsExecuted[id].Clear();
         activePhysics = null;
-        activePhysicsTriggerNorm = 0f;
-        activePhysicsTimeNorm = 0f;
+        activePhysicsTriggerSec = 0f;
+        activePhysicsTimeSec = 0f;
     }
 
     void OnPhysicsUpdate()
@@ -349,36 +393,27 @@ public class CharacterState : MonoBehaviour
         if (motionDict == null || characterController == null) return;
         if (!motionDict.TryGetValue(CurrentState.Id, out var motionData)) return;
 
-        float t = GetNormalizedTime();
+        float elapsed = GetStateElapsed();
         var executed = physicsExecuted[CurrentState.Id];
 
         bool justTriggered = false;
 
-        // 秒 → 归一化时间 转换
-        bool inTransition = animator.IsInTransition(0);
-        var stateInfo = inTransition ? animator.GetNextAnimatorStateInfo(0) : animator.GetCurrentAnimatorStateInfo(0);
-        float clipLen = stateInfo.length;
-        if (clipLen <= 0.001f) clipLen = 1f;
-
-        // 检查新触发的位移配置
+        // 检查新触发的位移配置（triggerSec/endSec 是秒，直接用流逝秒比较）
         for (int i = 0; i < motionData.physicsConfigs.Count; i++)
         {
             if (executed.Contains(i)) continue;
             var cfg = motionData.physicsConfigs[i];
             if (!cfg.enabled) continue;
-            float triggerNorm = cfg.triggerSec / clipLen;
-            float timeNorm = cfg.endSec / clipLen;
 
-            if (t >= triggerNorm)
+            if (elapsed >= cfg.triggerSec)
             {
                 executed.Add(i);
                 activePhysics = cfg;
                 justTriggered = true;
                 float duration = cfg.endSec - cfg.triggerSec;
                 activePhysicsVelocity = duration > 0.001f ? cfg.force / duration : cfg.force;
-                activePhysicsTriggerNorm = triggerNorm;
-                activePhysicsTimeNorm = timeNorm;
-                Debug.Log($"[位移] StateId={CurrentState.Id} 触发! force={cfg.force} time=[{cfg.triggerSec},{cfg.endSec}]s clip={clipLen:F2}s duration={duration:F3}s velocity={activePhysicsVelocity}");
+                activePhysicsTriggerSec = cfg.triggerSec;
+                activePhysicsTimeSec = cfg.endSec;
                 break;
             }
         }
@@ -389,13 +424,13 @@ public class CharacterState : MonoBehaviour
 
         // 应用当前位移（刚触发的同一帧不做过期检查）
         if (activePhysics == null) return;
-        if (!justTriggered && t >= activePhysicsTimeNorm)
+        if (!justTriggered && elapsed >= activePhysicsTimeSec)
         {
             activePhysics = null;
             return;
         }
 
-        float progress = (t - activePhysicsTriggerNorm) / Mathf.Max(0.0001f, activePhysicsTimeNorm - activePhysicsTriggerNorm);
+        float progress = (elapsed - activePhysicsTriggerSec) / Mathf.Max(0.0001f, activePhysicsTimeSec - activePhysicsTriggerSec);
         float cx = activePhysics.curveX.Evaluate(progress);
         float cy = activePhysics.curveY.Evaluate(progress);
         float cz = activePhysics.curveZ.Evaluate(progress);
@@ -413,14 +448,54 @@ public class CharacterState : MonoBehaviour
             Vector3 move = transform.TransformDirection(localMove); // 相对坐标 → 世界坐标
             if (!activePhysics.ignoreGravity)
                 move.y += Physics.gravity.y * Time.deltaTime;
+
+            // 停下/夹紧：前进=敌人进入 stopDst 内停；后退=退到敌人 stopDst 外停（防退过头）
+            if (activePhysics.stopDst > 0f)
+                StopAtDistance(ref move, localMove.z >= 0f);
+
             characterController.Move(move);
         }
+    }
 
-        // 前方检测到单位则停下
-        if (activePhysics.stopDst > 0f)
+    /// <summary>
+    /// 前后位移停下/夹紧：让角色正好停在离敌人 stopDst 米处。
+    /// 前进：敌人进入 stopDst 内就停；后退：退到敌人 stopDst 外就停，本帧位移夹紧不冲过头。
+    /// 按 localMove.z 正负判断前后（配置里的曲线方向）。
+    /// </summary>
+    void StopAtDistance(ref Vector3 move, bool movingForward)
+    {
+        float radius = characterController != null ? characterController.radius : 0.3f;
+        Vector3 origin = transform.position + Vector3.up * (characterController != null ? characterController.height * 0.5f : 1f);
+
+        bool hit = Physics.SphereCast(origin, radius, transform.forward, out var info, 50f, activePhysics.stopMask);
+        float fwd = Vector3.Dot(move, transform.forward); // 本帧世界位移的前后分量（正=前进，负=后退）
+
+        if (movingForward)
         {
-            if (Physics.Raycast(transform.position + Vector3.up, transform.forward, activePhysics.stopDst))
+            // 敌人已进入 stopDst 内 → 取消本帧前进量并停
+            if (hit && info.distance <= activePhysics.stopDst)
+            {
+                if (fwd > 0f) move -= transform.forward * fwd;
                 activePhysics = null;
+            }
+        }
+        else
+        {
+            if (!hit) { activePhysics = null; return; } // 前方无敌人 → 已是安全距离，停
+
+            float remaining = activePhysics.stopDst - info.distance; // 还需退多少才到 stopDst
+            if (remaining <= 0f)
+            {
+                activePhysics = null; // 已退到 stopDst
+            }
+            else if (fwd < 0f) // 本帧确实在后退
+            {
+                if (-fwd > remaining) // 这帧会退过头 → 夹到正好剩 remaining
+                {
+                    move -= transform.forward * (fwd + remaining);
+                    activePhysics = null;
+                }
+            }
         }
     }
 
@@ -456,10 +531,8 @@ public class CharacterState : MonoBehaviour
         if (effectDict == null) return;
         if (!effectDict.TryGetValue(CurrentState.Id, out var effectData)) return;
 
-        float t = GetNormalizedTime();
+        float elapsed = GetStateElapsed();
         var spawned = effectSpawned[CurrentState.Id];
-        float clipLen = animator.GetCurrentAnimatorStateInfo(0).length;
-        if (clipLen <= 0.001f) clipLen = 1f;
 
         for (int i = 0; i < effectData.effects.Count; i++)
         {
@@ -467,8 +540,7 @@ public class CharacterState : MonoBehaviour
             var cfg = effectData.effects[i];
             if (!cfg.enabled) continue;
 
-            float triggerNorm = cfg.triggerSec / clipLen;
-            if (t >= triggerNorm)
+            if (elapsed >= cfg.triggerSec)
             {
                 spawned.Add(i);
                 Transform parent = string.IsNullOrEmpty(cfg.bindPoint)
@@ -500,16 +572,14 @@ public class CharacterState : MonoBehaviour
     void OnCameraUpdate()
     {
         if (!cameraDict.TryGetValue(CurrentState.Id, out var data)) return;
-        float t = GetNormalizedTime();
-        float clipLen = animator.GetCurrentAnimatorStateInfo(0).length;
-        if (clipLen <= 0.001f) clipLen = 1f;
+        float elapsed = GetStateElapsed();
         int lastIdx = cameraKeyframeTrack[CurrentState.Id];
 
         for (int i = 0; i < data.timeline.Count; i++)
         {
             if (i <= lastIdx) continue;
             var kf = data.timeline[i];
-            if (t >= kf.triggerSec / clipLen)
+            if (elapsed >= kf.triggerSec)
             {
                 cameraKeyframeTrack[CurrentState.Id] = i;
                 // targetYaw 是相对角色的，叠上角色当前朝向转世界角度（哨兵 -999 保持不变）
@@ -529,7 +599,7 @@ public class CharacterState : MonoBehaviour
         if (lastIdx >= 0 && lastIdx < data.timeline.Count && lastIdx + 1 >= data.timeline.Count)
         {
             var lastKf = data.timeline[lastIdx];
-            if (t >= (lastKf.triggerSec + lastKf.duration) / clipLen)
+            if (elapsed >= lastKf.triggerSec + lastKf.duration)
             {
                 cameraKeyframeTrack[CurrentState.Id] = lastIdx + 1; // 标记已解锁，不再重复发
                 EventBus.Publish(CameraParamEvent.Release);
@@ -561,6 +631,29 @@ public class CharacterState : MonoBehaviour
             ref rotationVelocity, RotationSmoothTime);
 
         transform.rotation = Quaternion.Euler(0f, rotation, 0f);
+    }
+
+    /// <summary>
+    /// 锁定攻击转向：攻击起手设置的 faceTarget 生效，朝锁定敌人快速转身（0.05s），
+    /// 转到位自动清除。只在有 faceTarget 时工作，走路转身（DORotate）之后调用可覆盖它。
+    /// </summary>
+    void UpdateLockFace()
+    {
+        if (faceTarget == null) return;
+
+        Vector3 dir = faceTarget.position - transform.position;
+        dir.y = 0f;
+        if (dir.sqrMagnitude < 0.0001f) { faceTarget = null; return; }
+
+        float desired = Mathf.Atan2(dir.x, dir.z) * Mathf.Rad2Deg;
+        float angle = Mathf.SmoothDampAngle(
+            transform.eulerAngles.y, desired,
+            ref rotationVelocity, FaceTurnSmoothTime);
+
+        transform.rotation = Quaternion.Euler(0f, angle, 0f);
+
+        if (Mathf.Abs(Mathf.DeltaAngle(transform.eulerAngles.y, desired)) < 0.5f)
+            faceTarget = null;   // 已面对目标，转交给走路转身
     }
 
     // ═══════ 状态切换 ═══════
@@ -632,6 +725,7 @@ public class CharacterState : MonoBehaviour
         foreach (var seg in data.segments)
         {
             if (!seg.enabled) continue;
+            if (seg.shape == HitShape.Physical) continue; // 物理碰撞体形状在场景里摆，不画虚拟 Gizmo
             // Play 模式只画"正在判定的窗口"，窗口结束框消失；编辑模式常亮预览
             if (Application.isPlaying && !IsHitWindowActive(seg)) continue;
 
@@ -653,7 +747,18 @@ public class CharacterState : MonoBehaviour
                 continue;
             }
 
-            // 扇形：两条边线 + 弧线
+            if (seg.shape == HitShape.Box)
+            {
+                // 盒形：线框盒，跟随角色朝向 + yaw/pitch 偏转
+                Quaternion rot = transform.rotation * Quaternion.Euler(seg.pitchOffset, seg.yawOffset, 0f);
+                Matrix4x4 old = Gizmos.matrix;
+                Gizmos.matrix = Matrix4x4.TRS(center, rot, Vector3.one);
+                Gizmos.DrawWireCube(Vector3.zero, seg.boxSize);
+                Gizmos.matrix = old;
+                continue;
+            }
+
+            // 扇形：两条边线 + 弧线（fwd 保持原始世界旋转，两条边线能正常旋转）
             Vector3 fwd = Quaternion.Euler(seg.pitchOffset, seg.yawOffset, 0f) * transform.forward;
             Vector3 left = Quaternion.Euler(0f, -seg.halfAngle, 0f) * fwd;
             Vector3 right = Quaternion.Euler(0f, seg.halfAngle, 0f) * fwd;
@@ -665,7 +770,7 @@ public class CharacterState : MonoBehaviour
             for (int i = 1; i <= steps; i++)
             {
                 float ang = Mathf.Lerp(-seg.halfAngle, seg.halfAngle, (float)i / steps);
-                Vector3 dir = Quaternion.Euler(0f, seg.yawOffset + ang, 0f) * transform.forward;
+                Vector3 dir = Quaternion.Euler(0f, ang, 0f) * fwd;   // 基于 fwd（去掉原重复的 yawOffset），与边线同基准
                 Vector3 cur = center + dir * seg.radius;
                 Gizmos.DrawLine(prev, cur);
                 prev = cur;

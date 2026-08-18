@@ -1,230 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!114 &-7097713315161164238
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9baa5d1887dfa8c45931c5ed14c65140, type: 3}
-  m_Name: state_4
-  m_EditorClassIdentifier: 
-  CharacterId: 1001
-  UseCommon: 0
-  StateId: 10021
-  Info: "\u666E\u901A\u653B\u51FB1"
-  AnimName: Attack_01
-  OnAnimEnd: 1001
-  OnMove:
-  - 0
-  - 1
-  - 1001
-  OnAtk:
-  - 0
-  - 1
-  - 10022
-  OnSkill:
-  - 0
-  - 1
-  - 20021
-  OnEnhanceSkill:
-  - 10034
-  - 20034
-  UnlockEnhance: 0
---- !u!114 &-5784195616949306741
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9baa5d1887dfa8c45931c5ed14c65140, type: 3}
-  m_Name: state_10
-  m_EditorClassIdentifier: 
-  CharacterId: 1001
-  UseCommon: 0
-  StateId: 10033
-  Info: "\u6280\u80FD\u653B\u51FB3"
-  AnimName: Skill_03
-  OnAnimEnd: 1001
-  OnMove:
-  - 0
-  - 1
-  - 1001
-  OnAtk:
-  - 0
-  - 1
-  - 10022
-  OnSkill: []
-  OnEnhanceSkill: []
-  UnlockEnhance: 0
---- !u!114 &-5719704586668408184
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9baa5d1887dfa8c45931c5ed14c65140, type: 3}
-  m_Name: state_17
-  m_EditorClassIdentifier: 
-  CharacterId: 1001
-  UseCommon: 0
-  StateId: 20031
-  Info: "\u673A\u7532\u6280\u80FD1"
-  AnimName: Skill_Mech_01
-  OnAnimEnd: 2001
-  OnMove: []
-  OnAtk: []
-  OnSkill: []
-  OnEnhanceSkill: []
-  UnlockEnhance: 0
---- !u!114 &-5163416661281606202
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9baa5d1887dfa8c45931c5ed14c65140, type: 3}
-  m_Name: state_13
-  m_EditorClassIdentifier: 
-  CharacterId: 1001
-  UseCommon: 0
-  StateId: 20021
-  Info: "\u673A\u7532\u653B\u51FB1"
-  AnimName: Attack_Mech_01
-  OnAnimEnd: 2001
-  OnMove: []
-  OnAtk:
-  - 0
-  - 1
-  - 20022
-  OnSkill:
-  - 0
-  - 1
-  - 10021
-  OnEnhanceSkill:
-  - 20033
-  - 10033
-  UnlockEnhance: 0
---- !u!114 &-3034042447439048630
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9baa5d1887dfa8c45931c5ed14c65140, type: 3}
-  m_Name: state_8
-  m_EditorClassIdentifier: 
-  CharacterId: 1001
-  UseCommon: 0
-  StateId: 10031
-  Info: "\u6280\u80FD\u653B\u51FB1"
-  AnimName: Skill_01
-  OnAnimEnd: 1001
-  OnMove:
-  - 0
-  - 1
-  - 1001
-  OnAtk:
-  - 0
-  - 1
-  - 10022
-  OnSkill: []
-  OnEnhanceSkill: []
-  UnlockEnhance: 0
---- !u!114 &-2560147088188347184
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9baa5d1887dfa8c45931c5ed14c65140, type: 3}
-  m_Name: state_11
-  m_EditorClassIdentifier: 
-  CharacterId: 1001
-  UseCommon: 0
-  StateId: 10034
-  Info: "\u6280\u80FD\u653B\u51FB4"
-  AnimName: Skill_04
-  OnAnimEnd: 1001
-  OnMove:
-  - 0
-  - 1
-  - 1001
-  OnAtk: []
-  OnSkill: []
-  OnEnhanceSkill: []
-  UnlockEnhance: 0
---- !u!114 &-2068914072329580621
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9baa5d1887dfa8c45931c5ed14c65140, type: 3}
-  m_Name: state_20
-  m_EditorClassIdentifier: 
-  CharacterId: 1001
-  UseCommon: 0
-  StateId: 20034
-  Info: "\u673A\u7532\u6280\u80FD4"
-  AnimName: Skill_Mech_04
-  OnAnimEnd: 2001
-  OnMove: []
-  OnAtk:
-  - 0
-  - 1
-  - 20022
-  OnSkill: []
-  OnEnhanceSkill: []
-  UnlockEnhance: 0
---- !u!114 &-1338030817320176012
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9baa5d1887dfa8c45931c5ed14c65140, type: 3}
-  m_Name: state_9
-  m_EditorClassIdentifier: 
-  CharacterId: 1001
-  UseCommon: 0
-  StateId: 10032
-  Info: "\u6280\u80FD\u653B\u51FB2"
-  AnimName: Skill_02
-  OnAnimEnd: 1001
-  OnMove:
-  - 0
-  - 1
-  - 1001
-  OnAtk: []
-  OnSkill: []
-  OnEnhanceSkill: []
-  UnlockEnhance: 0
---- !u!114 &-157715907613806891
+--- !u!114 &-8728187892030961390
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -258,6 +34,160 @@ MonoBehaviour:
   - 10034
   - 20034
   UnlockEnhance: 1
+--- !u!114 &-8536490873880872905
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9baa5d1887dfa8c45931c5ed14c65140, type: 3}
+  m_Name: state_9
+  m_EditorClassIdentifier: 
+  CharacterId: 1001
+  UseCommon: 0
+  StateId: 10032
+  Info: "\u6280\u80FD\u653B\u51FB2"
+  AnimName: Skill_02
+  OnAnimEnd: 1001
+  OnMove:
+  - 0
+  - 1
+  - 1001
+  OnAtk: []
+  OnSkill: []
+  OnEnhanceSkill: []
+  UnlockEnhance: 0
+--- !u!114 &-4491720650676383213
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9baa5d1887dfa8c45931c5ed14c65140, type: 3}
+  m_Name: state_10
+  m_EditorClassIdentifier: 
+  CharacterId: 1001
+  UseCommon: 0
+  StateId: 10033
+  Info: "\u6280\u80FD\u653B\u51FB3"
+  AnimName: Skill_03
+  OnAnimEnd: 1001
+  OnMove:
+  - 0
+  - 1
+  - 1001
+  OnAtk:
+  - 0
+  - 1
+  - 10022
+  OnSkill: []
+  OnEnhanceSkill: []
+  UnlockEnhance: 0
+--- !u!114 &-1401534869432911740
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9baa5d1887dfa8c45931c5ed14c65140, type: 3}
+  m_Name: state_3
+  m_EditorClassIdentifier: 
+  CharacterId: 1001
+  UseCommon: 0
+  StateId: 1001
+  Info: "\u79FB\u52A8"
+  AnimName: Move
+  OnAnimEnd: 0
+  OnMove: []
+  OnAtk:
+  - 0
+  - 1
+  - 10021
+  OnSkill:
+  - 0
+  - 1
+  - 20021
+  OnEnhanceSkill:
+  - 10034
+  - 20034
+  UnlockEnhance: 0
+--- !u!114 &-1131982396517330496
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9baa5d1887dfa8c45931c5ed14c65140, type: 3}
+  m_Name: state_12
+  m_EditorClassIdentifier: 
+  CharacterId: 1001
+  UseCommon: 0
+  StateId: 2001
+  Info: "\u673A\u7532\u5F85\u673A"
+  AnimName: Stand_Mech
+  OnAnimEnd: 0
+  OnMove:
+  - 0
+  - 1
+  - 2004
+  OnAtk:
+  - 0
+  - 1
+  - 20021
+  OnSkill:
+  - 0
+  - 1
+  - 10021
+  OnEnhanceSkill:
+  - 20033
+  - 10033
+  UnlockEnhance: 0
+--- !u!114 &-361506729319863507
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9baa5d1887dfa8c45931c5ed14c65140, type: 3}
+  m_Name: state_14
+  m_EditorClassIdentifier: 
+  CharacterId: 1001
+  UseCommon: 0
+  StateId: 20022
+  Info: "\u673A\u7532\u653B\u51FB2"
+  AnimName: Attack_Mech_02
+  OnAnimEnd: 2001
+  OnMove:
+  - 0
+  - 1
+  - 2004
+  OnAtk:
+  - 0
+  - 1
+  - 20023
+  OnSkill:
+  - 0
+  - 1
+  - 10031
+  OnEnhanceSkill:
+  - 20033
+  - 10033
+  UnlockEnhance: 0
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -271,25 +201,235 @@ MonoBehaviour:
   m_Name: StateSOList
   m_EditorClassIdentifier: 
   list:
-  - {fileID: 1429350054281127985}
-  - {fileID: -7097713315161164238}
-  - {fileID: 7184886464082897069}
-  - {fileID: 495533347711795685}
-  - {fileID: -157715907613806891}
-  - {fileID: -3034042447439048630}
-  - {fileID: -1338030817320176012}
-  - {fileID: -5784195616949306741}
-  - {fileID: -2560147088188347184}
-  - {fileID: 6034429791495001805}
-  - {fileID: -5163416661281606202}
-  - {fileID: 4949724207424540793}
-  - {fileID: 1410744030476271115}
-  - {fileID: 2056884004635874478}
-  - {fileID: -5719704586668408184}
-  - {fileID: 5350478260662708508}
-  - {fileID: 7683692277645791610}
-  - {fileID: -2068914072329580621}
---- !u!114 &495533347711795685
+  - {fileID: -1401534869432911740}
+  - {fileID: 4020400573947282083}
+  - {fileID: 5457868147294184254}
+  - {fileID: 4733649809906874531}
+  - {fileID: -8728187892030961390}
+  - {fileID: 4490451970933238985}
+  - {fileID: -8536490873880872905}
+  - {fileID: -4491720650676383213}
+  - {fileID: 7574576806233913028}
+  - {fileID: -1131982396517330496}
+  - {fileID: 6312685827311030080}
+  - {fileID: -361506729319863507}
+  - {fileID: 6508674532513782182}
+  - {fileID: 1272784008799136608}
+  - {fileID: 885161725926564601}
+  - {fileID: 3132652217107819516}
+  - {fileID: 2792028824697151831}
+  - {fileID: 7022083035621102425}
+  - {fileID: 4334695524030969341}
+--- !u!114 &885161725926564601
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9baa5d1887dfa8c45931c5ed14c65140, type: 3}
+  m_Name: state_17
+  m_EditorClassIdentifier: 
+  CharacterId: 1001
+  UseCommon: 0
+  StateId: 20031
+  Info: "\u673A\u7532\u6280\u80FD1"
+  AnimName: Skill_Mech_01
+  OnAnimEnd: 2001
+  OnMove:
+  - 0
+  - 1
+  - 2004
+  OnAtk: []
+  OnSkill: []
+  OnEnhanceSkill: []
+  UnlockEnhance: 0
+--- !u!114 &1272784008799136608
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9baa5d1887dfa8c45931c5ed14c65140, type: 3}
+  m_Name: state_16
+  m_EditorClassIdentifier: 
+  CharacterId: 1001
+  UseCommon: 0
+  StateId: 20024
+  Info: "\u673A\u7532\u653B\u51FB4"
+  AnimName: Attack_Mech_04
+  OnAnimEnd: 2001
+  OnMove:
+  - 0
+  - 1
+  - 2004
+  OnAtk:
+  - 0
+  - 1
+  - 20021
+  OnSkill:
+  - 0
+  - 1
+  - 10031
+  OnEnhanceSkill:
+  - 20033
+  - 10033
+  UnlockEnhance: 1
+--- !u!114 &2792028824697151831
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9baa5d1887dfa8c45931c5ed14c65140, type: 3}
+  m_Name: state_19
+  m_EditorClassIdentifier: 
+  CharacterId: 1001
+  UseCommon: 0
+  StateId: 20033
+  Info: "\u673A\u7532\u6280\u80FD3"
+  AnimName: Skill_Mech_03
+  OnAnimEnd: 2001
+  OnMove:
+  - 0
+  - 1
+  - 2004
+  OnAtk: []
+  OnSkill: []
+  OnEnhanceSkill: []
+  UnlockEnhance: 0
+--- !u!114 &3132652217107819516
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9baa5d1887dfa8c45931c5ed14c65140, type: 3}
+  m_Name: state_18
+  m_EditorClassIdentifier: 
+  CharacterId: 1001
+  UseCommon: 0
+  StateId: 20032
+  Info: "\u673A\u7532\u6280\u80FD2"
+  AnimName: Skill_Mech_02
+  OnAnimEnd: 2001
+  OnMove:
+  - 0
+  - 1
+  - 2004
+  OnAtk:
+  - 0
+  - 1
+  - 20022
+  OnSkill: []
+  OnEnhanceSkill: []
+  UnlockEnhance: 0
+--- !u!114 &4020400573947282083
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9baa5d1887dfa8c45931c5ed14c65140, type: 3}
+  m_Name: state_4
+  m_EditorClassIdentifier: 
+  CharacterId: 1001
+  UseCommon: 0
+  StateId: 10021
+  Info: "\u666E\u901A\u653B\u51FB1"
+  AnimName: Attack_01
+  OnAnimEnd: 1001
+  OnMove:
+  - 0
+  - 1
+  - 1001
+  OnAtk:
+  - 0
+  - 1
+  - 10022
+  OnSkill:
+  - 0
+  - 1
+  - 20021
+  OnEnhanceSkill:
+  - 10034
+  - 20034
+  UnlockEnhance: 0
+--- !u!114 &4334695524030969341
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9baa5d1887dfa8c45931c5ed14c65140, type: 3}
+  m_Name: state_21
+  m_EditorClassIdentifier: 
+  CharacterId: 1001
+  UseCommon: 0
+  StateId: 2004
+  Info: "\u673A\u7532\u79FB\u52A8"
+  AnimName: Move_Mech
+  OnAnimEnd: 0
+  OnMove: []
+  OnAtk:
+  - 0
+  - 1
+  - 20021
+  OnSkill:
+  - 0
+  - 1
+  - 10021
+  OnEnhanceSkill:
+  - 20033
+  - 10033
+  UnlockEnhance: 0
+--- !u!114 &4490451970933238985
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9baa5d1887dfa8c45931c5ed14c65140, type: 3}
+  m_Name: state_8
+  m_EditorClassIdentifier: 
+  CharacterId: 1001
+  UseCommon: 0
+  StateId: 10031
+  Info: "\u6280\u80FD\u653B\u51FB1"
+  AnimName: Skill_01
+  OnAnimEnd: 1001
+  OnMove:
+  - 0
+  - 1
+  - 1001
+  OnAtk:
+  - 0
+  - 1
+  - 10022
+  OnSkill: []
+  OnEnhanceSkill: []
+  UnlockEnhance: 0
+--- !u!114 &4733649809906874531
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -323,188 +463,7 @@ MonoBehaviour:
   - 10034
   - 20034
   UnlockEnhance: 0
---- !u!114 &1410744030476271115
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9baa5d1887dfa8c45931c5ed14c65140, type: 3}
-  m_Name: state_15
-  m_EditorClassIdentifier: 
-  CharacterId: 1001
-  UseCommon: 0
-  StateId: 20023
-  Info: "\u673A\u7532\u653B\u51FB3"
-  AnimName: Attack_Mech_03
-  OnAnimEnd: 2001
-  OnMove: []
-  OnAtk:
-  - 0
-  - 1
-  - 20024
-  OnSkill:
-  - 0
-  - 1
-  - 10031
-  OnEnhanceSkill:
-  - 20033
-  - 10033
-  UnlockEnhance: 0
---- !u!114 &1429350054281127985
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9baa5d1887dfa8c45931c5ed14c65140, type: 3}
-  m_Name: state_3
-  m_EditorClassIdentifier: 
-  CharacterId: 1001
-  UseCommon: 0
-  StateId: 1001
-  Info: "\u79FB\u52A8"
-  AnimName: Move
-  OnAnimEnd: 0
-  OnMove: []
-  OnAtk:
-  - 0
-  - 1
-  - 10021
-  OnSkill:
-  - 0
-  - 1
-  - 20021
-  OnEnhanceSkill:
-  - 10034
-  - 20034
-  UnlockEnhance: 0
---- !u!114 &2056884004635874478
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9baa5d1887dfa8c45931c5ed14c65140, type: 3}
-  m_Name: state_16
-  m_EditorClassIdentifier: 
-  CharacterId: 1001
-  UseCommon: 0
-  StateId: 20024
-  Info: "\u673A\u7532\u653B\u51FB4"
-  AnimName: Attack_Mech_04
-  OnAnimEnd: 2001
-  OnMove: []
-  OnAtk:
-  - 0
-  - 1
-  - 20021
-  OnSkill:
-  - 0
-  - 1
-  - 10031
-  OnEnhanceSkill:
-  - 20033
-  - 10033
-  UnlockEnhance: 1
---- !u!114 &4949724207424540793
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9baa5d1887dfa8c45931c5ed14c65140, type: 3}
-  m_Name: state_14
-  m_EditorClassIdentifier: 
-  CharacterId: 1001
-  UseCommon: 0
-  StateId: 20022
-  Info: "\u673A\u7532\u653B\u51FB2"
-  AnimName: Attack_Mech_02
-  OnAnimEnd: 2001
-  OnMove: []
-  OnAtk:
-  - 0
-  - 1
-  - 20023
-  OnSkill:
-  - 0
-  - 1
-  - 10031
-  OnEnhanceSkill:
-  - 20033
-  - 10033
-  UnlockEnhance: 0
---- !u!114 &5350478260662708508
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9baa5d1887dfa8c45931c5ed14c65140, type: 3}
-  m_Name: state_18
-  m_EditorClassIdentifier: 
-  CharacterId: 1001
-  UseCommon: 0
-  StateId: 20032
-  Info: "\u673A\u7532\u6280\u80FD2"
-  AnimName: Skill_Mech_02
-  OnAnimEnd: 2001
-  OnMove: []
-  OnAtk:
-  - 0
-  - 1
-  - 20022
-  OnSkill: []
-  OnEnhanceSkill: []
-  UnlockEnhance: 0
---- !u!114 &6034429791495001805
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9baa5d1887dfa8c45931c5ed14c65140, type: 3}
-  m_Name: state_12
-  m_EditorClassIdentifier: 
-  CharacterId: 1001
-  UseCommon: 0
-  StateId: 2001
-  Info: "\u673A\u7532\u5F85\u673A"
-  AnimName: Stand_Mech
-  OnAnimEnd: 0
-  OnMove: []
-  OnAtk:
-  - 0
-  - 1
-  - 20021
-  OnSkill:
-  - 0
-  - 1
-  - 10021
-  OnEnhanceSkill:
-  - 20033
-  - 10033
-  UnlockEnhance: 0
---- !u!114 &7184886464082897069
+--- !u!114 &5457868147294184254
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -538,7 +497,7 @@ MonoBehaviour:
   - 10034
   - 20034
   UnlockEnhance: 0
---- !u!114 &7683692277645791610
+--- !u!114 &6312685827311030080
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -548,15 +507,115 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9baa5d1887dfa8c45931c5ed14c65140, type: 3}
-  m_Name: state_19
+  m_Name: state_13
   m_EditorClassIdentifier: 
   CharacterId: 1001
   UseCommon: 0
-  StateId: 20033
-  Info: "\u673A\u7532\u6280\u80FD3"
-  AnimName: Skill_Mech_03
+  StateId: 20021
+  Info: "\u673A\u7532\u653B\u51FB1"
+  AnimName: Attack_Mech_01
   OnAnimEnd: 2001
-  OnMove: []
+  OnMove:
+  - 0
+  - 1
+  - 2004
+  OnAtk:
+  - 0
+  - 1
+  - 20022
+  OnSkill:
+  - 0
+  - 1
+  - 10021
+  OnEnhanceSkill:
+  - 20033
+  - 10033
+  UnlockEnhance: 0
+--- !u!114 &6508674532513782182
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9baa5d1887dfa8c45931c5ed14c65140, type: 3}
+  m_Name: state_15
+  m_EditorClassIdentifier: 
+  CharacterId: 1001
+  UseCommon: 0
+  StateId: 20023
+  Info: "\u673A\u7532\u653B\u51FB3"
+  AnimName: Attack_Mech_03
+  OnAnimEnd: 2001
+  OnMove:
+  - 0
+  - 1
+  - 2004
+  OnAtk:
+  - 0
+  - 1
+  - 20024
+  OnSkill:
+  - 0
+  - 1
+  - 10031
+  OnEnhanceSkill:
+  - 20033
+  - 10033
+  UnlockEnhance: 0
+--- !u!114 &7022083035621102425
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9baa5d1887dfa8c45931c5ed14c65140, type: 3}
+  m_Name: state_20
+  m_EditorClassIdentifier: 
+  CharacterId: 1001
+  UseCommon: 0
+  StateId: 20034
+  Info: "\u673A\u7532\u6280\u80FD4"
+  AnimName: Skill_Mech_04
+  OnAnimEnd: 2001
+  OnMove:
+  - 0
+  - 1
+  - 2004
+  OnAtk:
+  - 0
+  - 1
+  - 20022
+  OnSkill: []
+  OnEnhanceSkill: []
+  UnlockEnhance: 0
+--- !u!114 &7574576806233913028
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9baa5d1887dfa8c45931c5ed14c65140, type: 3}
+  m_Name: state_11
+  m_EditorClassIdentifier: 
+  CharacterId: 1001
+  UseCommon: 0
+  StateId: 10034
+  Info: "\u6280\u80FD\u653B\u51FB4"
+  AnimName: Skill_04
+  OnAnimEnd: 1001
+  OnMove:
+  - 0
+  - 1
+  - 1001
   OnAtk: []
   OnSkill: []
   OnEnhanceSkill: []

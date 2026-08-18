@@ -11,14 +11,12 @@ UserSettings/
 *.csproj
 *.sln
 .claude/
-
 # ─── 解包资源（目录+meta） ───
 Assets/Animation*
 Assets/Resources*
 Assets/TutorialInfo*
 Assets/Readme*
 Assets/UniversalRenderPipelineGlobalSettings*
-
 # ─── 资源文件类型 ───
 *.fbx
 *.png
@@ -36,7 +34,6 @@ Assets/UniversalRenderPipelineGlobalSettings*
 *.mp3
 *.mp4
 *.webm
-
 # ─── 资源文件类型的 .meta ───
 *.fbx.meta
 *.png.meta
@@ -54,7 +51,6 @@ Assets/UniversalRenderPipelineGlobalSettings*
 *.mp3.meta
 *.mp4.meta
 *.webm.meta
-
 # ─── .asset 只保留 Settings 和 Resources/Config 下的配置 SO ───
 *.asset
 !Assets/Settings/*.asset
@@ -62,30 +58,26 @@ Assets/UniversalRenderPipelineGlobalSettings*
 !Assets/Resources/Config/*.asset
 !Assets/Resources/Config/**/*.asset
 !Assets/Resources/AmsMotion.asset
-
 *.asset.meta
 !Assets/Settings/*.asset.meta
 !Assets/Settings/**/*.asset.meta
 !Assets/Resources/Config/*.asset.meta
 !Assets/Resources/Config/**/*.asset.meta
 !Assets/Resources/AmsMotion.asset.meta
-
 # ─── .mat 只保留自己建的材质 ───
-*.mat
 !Assets/Resources/ams_weapon3/Materials/*.mat
 !Assets/Resources/ams_weapon4/Materials/*.mat
 !Assets/Resources/ams_mech/Materials/*.mat
-*.mat.meta
 !Assets/Resources/ams_weapon3/Materials/*.mat.meta
 !Assets/Resources/ams_weapon4/Materials/*.mat.meta
 !Assets/Resources/ams_mech/Materials/*.mat.meta
-
 # ─── .shader / .shadergraph 提交 ───
 !Assets/Resources/**/*.shader
 !Assets/Resources/**/*.shadergraph
 !Assets/Resources/**/*.shader.meta
 !Assets/Resources/**/*.shadergraph.meta
-
 # ─── 自己建的 .prefab（光刃面片等） ───
 !Assets/Resources/ams_weapon3/Models/*.prefab
 !Assets/Resources/ams_weapon3/Models/*.prefab.meta
+~$*.xlsx
+ARPG_Demo/

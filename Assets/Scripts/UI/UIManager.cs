@@ -19,6 +19,8 @@ public class UIManager : Singleton<UIManager>
         Debug.Log($"[UIManager] Awake, Instance={(Instance != null)}, inventoryPanel={(inventoryPanel != null ? inventoryPanel.name : "NULL")}");
     }
 
+
+
     void Start()
     {
         CloseAll();
@@ -86,3 +88,4 @@ public class UIManager : Singleton<UIManager>
         EventBus.Publish(new UIPanelChangedEvent(anyOpen));
     }
 }
+

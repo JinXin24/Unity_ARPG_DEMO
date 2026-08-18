@@ -44,8 +44,7 @@ public class WeaponVisibleService : FSMServiceBase
     public override void OnUpdate()
     {
         if (weaponDict == null || !weaponDict.TryGetValue(Owner.CurrentState.Id, out var data)) return;
-        float t = Owner.GetNormalizedTime();
-        float clipLen = Owner.GetClipLength();
+        float elapsed = Owner.GetStateElapsed();   // 进入状态后的流逝秒（showSec/hideSec 是秒，直接比）
 
         foreach (var w in data.weapons)
         {
@@ -53,12 +52,9 @@ public class WeaponVisibleService : FSMServiceBase
             var tr = string.IsNullOrEmpty(w.weaponPath) ? null : Owner.transform.Find(w.weaponPath);
             if (tr == null) continue;
 
-            float showNorm = w.showSec / clipLen;
-            float hideNorm = w.hideSec / clipLen;
-
-            if (t >= showNorm && t < hideNorm)
+            if (elapsed >= w.showSec && elapsed < w.hideSec)
                 tr.gameObject.SetActive(true);
-            else if (t >= hideNorm)
+            else if (elapsed >= w.hideSec)
                 tr.gameObject.SetActive(false);
         }
     }

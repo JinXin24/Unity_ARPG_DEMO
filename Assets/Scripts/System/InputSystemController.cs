@@ -104,6 +104,7 @@ public class InputSystemController : Singleton<InputSystemController>, IEventRec
     public bool GetAttackPressed() => !Cursor.visible && Input.GetMouseButtonDown(0);
     public bool GetRunModeToggled() => Input.GetKeyDown(KeyCode.LeftControl);
     public bool GetSkillPressed() => Input.GetKeyDown(KeyCode.E);
+    public bool GetLockOnPressed() => !Cursor.visible && Input.GetMouseButtonDown(2);   // 中键：锁定/解除锁定
 
     /// <summary>是否正在呼出鼠标（UI 模式或按住左 Alt 期间）</summary>
     public bool IsCursorVisible() => Cursor.visible;

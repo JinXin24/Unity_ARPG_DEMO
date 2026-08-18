@@ -23,6 +23,8 @@ public class PhysicsConfig
     public bool ignoreGravity;
     [Header("前方碰到单位后停下 (米)")]
     public float stopDst;
+    [Header("停下检测层 (只在这层上有东西才停)")]
+    public LayerMask stopMask = 1 << 7; // 默认 Monster 层
 
     [Header("移动子节点（而不是根节点）")]
     public bool moveChild;

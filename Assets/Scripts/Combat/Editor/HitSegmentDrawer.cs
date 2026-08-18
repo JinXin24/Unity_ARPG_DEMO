@@ -20,11 +20,15 @@ public class HitSegmentDrawer : PropertyDrawer
         ("damage",      "伤害",                         null),
         ("radius",      "范围 (球半径/扇形距离)",      new[] { (int)HitShape.Sphere, (int)HitShape.Sector }),
         ("halfAngle",   "扇形半角 (度)",                new[] { (int)HitShape.Sector }),
-        ("yawOffset",   "水平偏转 (度)",                new[] { (int)HitShape.Sector, (int)HitShape.Line }),
-        ("pitchOffset", "俯仰偏转 (度)",                new[] { (int)HitShape.Sector, (int)HitShape.Line }),
+        ("sectorSlices", "扇形分段数 (1=瞬发,>1逐片扫)", new[] { (int)HitShape.Sector }),
+        ("sweepFromRight", "从右往左扫 (勾选=反向)", new[] { (int)HitShape.Sector }),
+        ("yawOffset",   "水平偏转 (度)",                new[] { (int)HitShape.Sector, (int)HitShape.Line, (int)HitShape.Box }),
+        ("pitchOffset", "俯仰偏转 (度)",                new[] { (int)HitShape.Sector, (int)HitShape.Line, (int)HitShape.Box }),
         ("lineLength",  "线段长度",                    new[] { (int)HitShape.Line }),
         ("lineWidth",   "线段粗细",                    new[] { (int)HitShape.Line }),
-        ("offset",      "中心偏移",                    null),
+        ("lineTravelSpeed", "剑气飞行速度 (米/秒，0=瞬发)", new[] { (int)HitShape.Line }),
+        ("boxSize",     "盒子尺寸 (长/高/宽)",          new[] { (int)HitShape.Box }),
+        ("offset",      "中心偏移",                    new[] { (int)HitShape.Sphere, (int)HitShape.Sector, (int)HitShape.Line, (int)HitShape.Box }),
         ("hitMask",     "命中层",                      null),
     };
 

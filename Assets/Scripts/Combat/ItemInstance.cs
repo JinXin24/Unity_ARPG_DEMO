@@ -10,6 +10,7 @@ public enum ItemType
     Consumable, // 消耗品
 }
 
+
 /// <summary>物品实例基类 — 背包里每条记录都是一个 ItemInstance</summary>
 [System.Serializable]
 public class ItemInstance

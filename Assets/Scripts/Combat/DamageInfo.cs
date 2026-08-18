@@ -6,7 +6,9 @@ using UnityEngine;
 /// </summary>
 public struct DamageInfo
 {
-    public int Damage;       // 最终伤害
-    public Vector3 HitPoint; // 命中点
-    public Vector3 HitDir;   // 命中方向（攻击方→目标）
+    public int Damage;        // 最终伤害
+    public bool IsCrit;       // 是否暴击
+    public Vector3 HitPoint;  // 命中点
+    public Vector3 HitDir;    // 命中方向（攻击方→目标）
+    public GameObject Source; // 攻击来源（谁打的）
 }

@@ -42,6 +42,7 @@ public static class HitSegmentSceneTool
         {
             var seg = data.segments[i];
             if (!seg.enabled) continue;
+            if (seg.shape == HitShape.Physical) continue; // 物理碰撞体形状在场景里摆，不画手柄
 
             Handles.color = seg.shape == HitShape.Sphere ? Color.green :
                             seg.shape == HitShape.Line   ? Color.cyan : Color.yellow;
@@ -54,6 +55,8 @@ public static class HitSegmentSceneTool
                 DrawLineHandles(seg, center, dir, t, i);
             else if (seg.shape == HitShape.Sector)
                 DrawSectorHandles(seg, center, dir, t, i);
+            else if (seg.shape == HitShape.Box)
+                DrawBoxHandles(seg, center, t, i);
             else
                 DrawSphereHandles(seg, center, t, i);
         }
@@ -110,6 +113,26 @@ public static class HitSegmentSceneTool
         Vector3 newRadiusPt = Handles.Slider(radiusPt, fwd, hSize, Handles.SphereHandleCap, 0.1f);
         if (EditorGUI.EndChangeCheck())
             seg.radius = Mathf.Max(0.1f, Vector3.Dot(newRadiusPt - center, fwd));
+
+        Quaternion rot = t.rotation * Quaternion.Euler(seg.pitchOffset, seg.yawOffset, 0f);
+        EditorGUI.BeginChangeCheck();
+        Quaternion newRot = Handles.RotationHandle(rot, center);
+        if (EditorGUI.EndChangeCheck())
+        {
+            Vector3 localFwd = Quaternion.Inverse(t.rotation) * (newRot * Vector3.forward);
+            seg.pitchOffset = -Mathf.Asin(localFwd.y) * Mathf.Rad2Deg;
+            seg.yawOffset = Mathf.Atan2(localFwd.x, localFwd.z) * Mathf.Rad2Deg;
+        }
+
+        Handles.Label(center + Vector3.up * 0.15f, $"段{idx}", EditorStyles.whiteBoldLabel);
+    }
+
+    static void DrawBoxHandles(HitSegment seg, Vector3 center, Transform t, int idx)
+    {
+        EditorGUI.BeginChangeCheck();
+        Vector3 newCenter = Handles.PositionHandle(center, t.rotation);
+        if (EditorGUI.EndChangeCheck())
+            seg.offset = Quaternion.Inverse(t.rotation) * (newCenter - t.position);
 
         Quaternion rot = t.rotation * Quaternion.Euler(seg.pitchOffset, seg.yawOffset, 0f);
         EditorGUI.BeginChangeCheck();

@@ -12,6 +12,8 @@ public class EffectConfig
     [Header("特效预制体")]
     public GameObject effectPrefab;
     [Header("挂点路径 (角色的子物体路径)")]
+
+    
     public string bindPoint;
     [Header("持续时长 (秒, 0=跟随动画销毁)")]
     public float duration;
