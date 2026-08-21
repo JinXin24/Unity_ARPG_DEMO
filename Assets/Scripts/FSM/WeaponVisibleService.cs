@@ -12,6 +12,9 @@ public class WeaponVisibleService : FSMServiceBase
     private StateWeaponSO weaponSO;
     private Dictionary<int, StateWeaponData> weaponDict;
 
+    // 当前状态已显示（露出）的武器，状态被切走时统一隐藏，防止残留到下一个状态
+    private readonly List<Transform> shownThisState = new();
+
     /// <summary>传入武器显隐配置 SO（Inspector 里 CharacterState 拖的那个）</summary>
     public WeaponVisibleService(StateWeaponSO so)
     {
@@ -33,6 +36,9 @@ public class WeaponVisibleService : FSMServiceBase
 
     public override void OnBegin()
     {
+        // 切到新状态：先把上一状态所有暴露过的武器无条件隐藏（不管 hideSec 到没到），杜绝残留
+        HideAllShown();
+
         if (weaponDict == null || !weaponDict.TryGetValue(Owner.CurrentState.Id, out var data)) return;
         foreach (var w in data.weapons)
         {
@@ -52,10 +58,25 @@ public class WeaponVisibleService : FSMServiceBase
             var tr = string.IsNullOrEmpty(w.weaponPath) ? null : Owner.transform.Find(w.weaponPath);
             if (tr == null) continue;
 
+            // 掐秒逻辑保留：窗口内显示，到 hideSec 隐藏
             if (elapsed >= w.showSec && elapsed < w.hideSec)
-                tr.gameObject.SetActive(true);
+            {
+                if (!tr.gameObject.activeSelf) tr.gameObject.SetActive(true);
+                if (!shownThisState.Contains(tr)) shownThisState.Add(tr);
+            }
             else if (elapsed >= w.hideSec)
+            {
                 tr.gameObject.SetActive(false);
+                shownThisState.Remove(tr);
+            }
         }
+    }
+
+    /// <summary>状态被切走兜底：隐藏所有当前状态已显示、还没到 hideSec 的武器</summary>
+    void HideAllShown()
+    {
+        foreach (var t in shownThisState)
+            if (t != null) t.gameObject.SetActive(false);
+        shownThisState.Clear();
     }
 }

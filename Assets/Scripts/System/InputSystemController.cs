@@ -103,8 +103,10 @@ public class InputSystemController : Singleton<InputSystemController>, IEventRec
 
     public bool GetAttackPressed() => !Cursor.visible && Input.GetMouseButtonDown(0);
     public bool GetRunModeToggled() => Input.GetKeyDown(KeyCode.LeftControl);
+    public bool GetSprintHeld() => Input.GetKey(KeyCode.LeftShift);   // 左 Shift：冲刺（按住进入，松开退出）
     public bool GetSkillPressed() => Input.GetKeyDown(KeyCode.E);
     public bool GetLockOnPressed() => !Cursor.visible && Input.GetMouseButtonDown(2);   // 中键：锁定/解除锁定
+    public bool GetJumpPressed() => Input.GetKeyDown(KeyCode.Space);   // 空格：跳跃
 
     /// <summary>是否正在呼出鼠标（UI 模式或按住左 Alt 期间）</summary>
     public bool IsCursorVisible() => Cursor.visible;

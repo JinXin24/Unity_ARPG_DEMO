@@ -22,6 +22,7 @@ public class CharacterState : MonoBehaviour
     [SerializeField] private StateWeaponSO weaponSO;
     [SerializeField] private StateWeaponThrowSO weaponThrowSO;
     [SerializeField] private StateHitSO hitSO;
+    [SerializeField] private AnimTransitionSO animTransitionSO;   // 过渡配置（站稳区间 + 过渡对齐 + 过渡时长）
     [SerializeField] private int characterId = 1001;   // 对应 CharacterManager 角色ID，攻击结算取攻击方数值
     [SerializeField] private MoveConfigSO moveConfig;
     [SerializeField] protected CameraStateSO cameraSO;
@@ -35,6 +36,18 @@ public class CharacterState : MonoBehaviour
     public PlayerState CurrentState { get; private set; }
     private Dictionary<int, PlayerState> stateData = new();
     protected CharacterController characterController;
+
+    // 空中/地面状态判断 — 供其他逻辑读取
+    [Header("状态判断")]
+    [SerializeField, Tooltip("角色当前是否站在地面上（只读，每帧更新）")]
+    private bool grounded;
+    /// <summary>角色是否站在地面上（由 CharacterController 判定）</summary>
+    public bool IsGrounded => grounded;
+    /// <summary>角色是否在空中（取反）</summary>
+    public bool IsInAir => !grounded;
+
+    // 跳跃惯性 — 进入空中前记录的水平速度，空中时保持（方案B）
+    private Vector3 jumpInertia;   // 进入空中前的水平速度
 
     // Blend Tree — 1D, Speed 参数 (0=待机, 0.5=走, 1=跑)
     private float speedVelocity;
@@ -58,6 +71,10 @@ public class CharacterState : MonoBehaviour
     private float activePhysicsTriggerSec;
     private float activePhysicsTimeSec;
     private bool animEndFired;
+
+    // 统一重力缩放 — 默认 1 用 Physics.gravity(-9.81)，调小则下落变轻
+    [SerializeField, Tooltip("重力缩放系数，1=物理默认(-9.81)，调小则下落更慢")]
+    private float gravityScale = 1f;
 
     // 特效
     private Dictionary<int, StateEffectData> effectDict;
@@ -149,6 +166,22 @@ public class CharacterState : MonoBehaviour
             if (cfg.OnSkill != null && cfg.OnSkill.Length >= 3)
                 AddListener(cfg.StateId, StateEventType.Update, OnSkillCheck);
 
+            // 注册冲刺检测：有 OnSprint 配置时，每帧检测左 Shift
+            if (cfg.OnSprint != null && cfg.OnSprint.Length >= 3)
+                AddListener(cfg.StateId, StateEventType.Update, OnSprintCheck);
+
+            // 注册跳跃检测：有 OnJump 配置时，每帧检测跳键
+            if (cfg.OnJump != null && cfg.OnJump.Length >= 3)
+                AddListener(cfg.StateId, StateEventType.Update, OnJumpCheck);
+
+            // 注册空中下落检测：有 OnFalling 配置时，空中在该窗口切到对应状态
+            if (cfg.OnFalling != null && cfg.OnFalling.Length >= 3)
+                AddListener(cfg.StateId, StateEventType.Update, OnFallingCheck);
+
+            // 注册落地检测：有 OnLand 配置时，地面在该窗口切到对应状态
+            if (cfg.OnLand != null && cfg.OnLand.Length >= 3)
+                AddListener(cfg.StateId, StateEventType.Update, OnLandCheck);
+
             // 注册强化技能检测：有 OnEnhanceSkill 配置时，每帧检测
             if (cfg.OnEnhanceSkill != null && cfg.OnEnhanceSkill.Length >= 2)
                 AddListener(cfg.StateId, StateEventType.Update, OnEnhanceSkillCheck);
@@ -206,15 +239,43 @@ public class CharacterState : MonoBehaviour
         UpdateLockFace();   // 锁定攻击转向（优先级高于走路转身，覆盖上一行结果）
 
         // 移动：Blend Tree Speed → 世界位移速度（按状态区分）
-        if (moveConfig != null && characterController != null && currentSpeed > 0.01f)
+        // 地面：正常移动并记录实际水平速度（供跳跃惯性）；空中：保持进入空中前的水平惯性
+        if (characterController != null)
         {
-            float worldSpeed = moveConfig.GetMoveSpeed(CurrentState.Id, currentSpeed);
-            characterController.Move(transform.forward * worldSpeed * Time.deltaTime);
+            if (IsInAir)
+            {
+                // 空中：保持跳跃前水平惯性（跳跃位移配置多为纯Y轴，横向不冲突）
+                Vector3 inertia = new Vector3(jumpInertia.x, 0, jumpInertia.z);
+                if (inertia.sqrMagnitude > 0.0001f)
+                    characterController.Move(inertia * Time.deltaTime);
+            }
+            else
+            {
+                // 地面：正常移动（若配置了），并记录实际水平速度供空中保持惯性
+                bool hasMoveInput = InputSystemController.Instance.GetMoveInput().magnitude > 0.01f;
+                if (hasMoveInput && moveConfig != null && currentSpeed > 0.01f)
+                {
+                    float worldSpeed = moveConfig.GetMoveSpeed(CurrentState.Id, currentSpeed);
+                    characterController.Move(transform.forward * worldSpeed * Time.deltaTime);
+                    // 只有真正产生水平移动时才更新惯性速度；否则保留旧值（避免 Move(0) 把 velocity 清零而覆盖 jumpInertia）
+                    if (worldSpeed > 0.01f)
+                        jumpInertia = new Vector3(characterController.velocity.x, 0, characterController.velocity.z);
+                }
+                else if (!hasMoveInput)
+                {
+                    // 没按移动键 → 静止，清空惯性（防止静止起跳还带着旧惯性）
+                    jumpInertia = Vector3.zero;
+                }
+                // 有移动输入但 worldSpeed=0（如起跳状态 10051）→ 保留 jumpInertia（起跳惯性意图仍在）
+            }
         }
 
 
+        // 统一重力：仅当当前没有位移配置接管时，才叠加重力下落（地面被碰撞挡住，空中自然下落）
+        ApplyGravity();
 
-
+        // 每帧更新地面/空中状态（放在 Move 之后，isGrounded 反映最新碰撞结果）
+        grounded = characterController != null && characterController.isGrounded;
 
         // 动画播完检测（用原始 normalizedTime，不用 %1f 的版本）
         if (!animEndFired && !animator.IsInTransition(0))
@@ -284,6 +345,61 @@ public class CharacterState : MonoBehaviour
         return CurrentState != null ? Time.time - CurrentState.BeginTime : 0f;
     }
 
+    // ═══════ 脚相位（站稳区间标定 + 过渡对齐） ═══════
+
+    /// <summary>判断当前动画处于哪种站稳（左脚/右脚/双脚）。依赖 animTransitionSO 的区间标定。</summary>
+    public FootStance GetCurrentStance()
+    {
+        if (animTransitionSO == null || CurrentState == null) return FootStance.None;
+        var data = animTransitionSO.GetStance(CurrentState.Id);
+        if (data == null) return FootStance.None;
+
+        float norm = GetNormalizedTime();
+        if (IsInRange(norm, data.leftStart, data.leftEnd)) return FootStance.LeftFoot;
+        if (IsInRange(norm, data.rightStart, data.rightEnd)) return FootStance.RightFoot;
+        if (IsInRange(norm, data.bothStart, data.bothEnd)) return FootStance.BothFeet;
+        return FootStance.None;
+    }
+
+    /// <summary>
+    /// 计算从 fromId 切到 toId 时，目标动画的切入点（归一化时间）。
+    /// 规则：查过渡对 → 确定对齐到哪种站稳 → 返回目标动画该站稳区间的中点。
+    /// 查不到过渡对 → 返回 0（从头切）。
+    /// </summary>
+    float GetEnterNorm(int fromId, int toId)
+    {
+        if (animTransitionSO == null) return 0f;
+        var trans = animTransitionSO.GetTransition(fromId, toId);
+        var toData = animTransitionSO.GetStance(toId);
+        if (toData == null) return 0f;
+
+        if (trans != null)
+        {
+            switch (trans.alignStance)
+            {
+                case FootStance.LeftFoot: return (toData.leftStart + toData.leftEnd) * 0.5f;
+                case FootStance.RightFoot: return (toData.rightStart + toData.rightEnd) * 0.5f;
+                case FootStance.BothFeet: return (toData.bothStart + toData.bothEnd) * 0.5f;
+            }
+        }
+        return 0f;
+    }
+
+    /// <summary>从 fromId 切到 toId 的过渡时长（秒）。查不到用默认 0.12。</summary>
+    float GetCrossFadeDur(int fromId, int toId)
+    {
+        if (animTransitionSO == null) return 0.12f;
+        var trans = animTransitionSO.GetTransition(fromId, toId);
+        return trans != null ? trans.crossFadeDur : 0.12f;
+    }
+
+    /// <summary>归一化时间是否落在区间内（处理跨 0 边界的循环动画）</summary>
+    static bool IsInRange(float v, float a, float b)
+    {
+        if (a <= b) return v >= a && v <= b;
+        return v >= a || v <= b;   // 跨 0：如 [0.9, 0.1]
+    }
+
     /// <summary>攻击方数值快照（攻击结算用），CharacterManager 没挂则返回 null</summary>
     public CharacterStats GetStats()
     {
@@ -321,6 +437,88 @@ public class CharacterState : MonoBehaviour
         if (CheckConfig(CurrentState.Config.OnMove))
         {
             ToNext((int)CurrentState.Config.OnMove[2]);
+        }
+    }
+
+    /// <summary>
+    /// 冲刺检测：按住左 Shift，且当前状态配置了 OnSprint = [窗口始, 窗口末, 目标StateId]。
+    /// 相位落在窗口内才允许切（0;1;1004 = 全程可切到冲刺 1004）。
+    /// </summary>
+    void OnSprintCheck()
+    {
+        if (!InputSystemController.Instance.GetSprintHeld()) return;   // 松开左 Shift 不触发
+        var arr = CurrentState.Config.OnSprint;
+        if (arr == null || arr.Length < 3) return;
+
+        for (int i = 0; i + 2 < arr.Length; i += 3)
+        {
+            if (CheckWindow(arr[i], arr[i + 1]))
+            {
+                ToNext((int)arr[i + 2]);
+                return;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 跳跃检测：按空格，且当前状态配置了 OnJump = [窗口始, 窗口末, 目标StateId]。
+    /// 相位落在窗口内才允许切（0;1;10051 = 全程可切到跳跃 10051）。
+    /// </summary>
+    void OnJumpCheck()
+    {
+        if (!InputSystemController.Instance.GetJumpPressed()) return;   // 没按空格不触发
+        var arr = CurrentState.Config.OnJump;
+        if (arr == null || arr.Length < 3) return;
+
+        for (int i = 0; i + 2 < arr.Length; i += 3)
+        {
+            if (CheckWindow(arr[i], arr[i + 1]))
+            {
+                ToNext((int)arr[i + 2]);
+                return;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 空中下落检测：`OnFalling` = [窗口始, 窗口末, 目标StateId]。
+    /// 仅在角色处于空中（IsInAir）且动画相位落在窗口内时，切到对应状态。
+    /// 例：10051 起跳在相位 0.68~1 切到 10053 滞空。
+    /// </summary>
+    void OnFallingCheck()
+    {
+        if (!IsInAir) return;   // 仅在空中触发
+        var arr = CurrentState.Config.OnFalling;
+        if (arr == null || arr.Length < 3) return;
+
+        for (int i = 0; i + 2 < arr.Length; i += 3)
+        {
+            if (CheckWindow(arr[i], arr[i + 1]))
+            {
+                ToNext((int)arr[i + 2]);
+                return;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 落地检测：`OnLand` = [窗口始, 窗口末, 目标StateId]。
+    /// 仅在角色处于地面（IsGrounded）且动画相位落在窗口内时，切到对应状态。
+    /// 例：10053 滞空在相位 0~1 切到 1001 待机（落地）。
+    /// </summary>
+    void OnLandCheck()
+    {
+        if (!IsGrounded) return;   // 仅在地面触发
+        var arr = CurrentState.Config.OnLand;
+        if (arr == null || arr.Length < 3) return;
+
+        for (int i = 0; i + 2 < arr.Length; i += 3)
+        {
+            if (CheckWindow(arr[i], arr[i + 1]))
+            {
+                ToNext((int)arr[i + 2]);
+                return;
+            }
         }
     }
 
@@ -386,6 +584,18 @@ public class CharacterState : MonoBehaviour
         activePhysics = null;
         activePhysicsTriggerSec = 0f;
         activePhysicsTimeSec = 0f;
+    }
+
+    /// <summary>
+    /// 统一重力下落。仅当当前没有位移配置接管（activePhysics == null）时生效。
+    /// - 配了 motion 且正在位移：位移逻辑自己处理重力（按 ignoreGravity），这里跳过。
+    /// - 没配 motion / 位移结束：这里叠加重力，角色在空中自然下落；在地面被碰撞挡住则不动。
+    /// </summary>
+    void ApplyGravity()
+    {
+        if (characterController == null) return;
+        if (activePhysics != null) return;   // 正在位移，由位移逻辑处理
+        characterController.Move(Physics.gravity * gravityScale * Time.deltaTime);
     }
 
     void OnPhysicsUpdate()
@@ -481,7 +691,8 @@ public class CharacterState : MonoBehaviour
         }
         else
         {
-            if (!hit) { activePhysics = null; return; } // 前方无敌人 → 已是安全距离，停
+            // 前方无敌人 → 不是"退到敌人安全距离"场景（如没锁定/前方没人），正常后退，不掐位移
+            if (!hit) return;
 
             float remaining = activePhysics.stopDst - info.distance; // 还需退多少才到 stopDst
             if (remaining <= 0f)
@@ -661,6 +872,7 @@ public class CharacterState : MonoBehaviour
     public bool ToNext(int stateId)
     {
         if (!stateData.TryGetValue(stateId, out var next)) return false;
+        int prevStateId = CurrentState != null ? CurrentState.Id : -1;   // 记录来源状态（切过渡锚点用）
         if (CurrentState != null)
         {
             DOStateEvent(CurrentState.Id, StateEventType.End);            // 旧状态 End 事件
@@ -670,7 +882,19 @@ public class CharacterState : MonoBehaviour
         CurrentState = next;
         CurrentState.SetBeginTime();
         animEndFired = false;
-        animator.CrossFade(CurrentState.Config.AnimName, 0.016f);
+
+        // 过渡：用脚相位锚点（过渡对配置）+ FixedTime 时长。查不到过渡对则用默认 0.12s 从头切。
+        if (animTransitionSO != null)
+        {
+            float dur = GetCrossFadeDur(prevStateId, stateId);
+            float enter = GetEnterNorm(prevStateId, stateId);
+            animator.CrossFadeInFixedTime(CurrentState.Config.AnimName, dur, 0, enter);
+        }
+        else
+        {
+            animator.CrossFade(CurrentState.Config.AnimName, 0.016f); // 未配脚相位 → 保持原逻辑
+        }
+
         DOStateEvent(CurrentState.Id, StateEventType.Begin);              // 新状态 Begin 事件
         for (int i = 0; i < services.Count; i++) services[i].OnBegin();   // 新状态服务初始化
         OnStateBegin(CurrentState);

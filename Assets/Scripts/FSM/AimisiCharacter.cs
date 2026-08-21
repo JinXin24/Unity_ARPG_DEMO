@@ -64,6 +64,10 @@ public class AimisiCharacter : CharacterState
 
     void Awake()
     {
+        // 先确保 characterController 就绪，否则 ApplyCollider 拿不到，启动时碰撞体参数不会被应用。
+        // （CharacterState.Start() 里也会获取，这里提前拿避免时序问题）
+        if (characterController == null)
+            characterController = GetComponentInChildren<CharacterController>();
         SwitchToHuman();
     }
 

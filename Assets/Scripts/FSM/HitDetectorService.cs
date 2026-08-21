@@ -68,7 +68,7 @@ public class HitDetectorService : FSMServiceBase
             if (!seg.enabled) continue;
             if (exe.Contains(i)) continue; // 窗口已结束，本段不再检测
 
-            Debug.Log($"elapsed={elapsed:F3} seg={i}");   // 调试：保留你的日志，改看流逝秒
+            //Debug.Log($"elapsed={elapsed:F3} seg={i}");   // 调试：保留你的日志，改看流逝秒
 
             if (elapsed < seg.triggerSec) continue; // 未到触发时刻（秒）
 
@@ -97,7 +97,7 @@ public class HitDetectorService : FSMServiceBase
             // 扇形扫掠：sectorSlices>1 时在窗口内逐片展开（剑挥到哪、那片才结算）
             if (seg.shape == HitShape.Sector && seg.sectorSlices > 1)
             {
-                Debug.Log("检测开始");
+                //Debug.Log("检测开始");
                 float progress = Mathf.InverseLerp(seg.triggerSec, seg.triggerSec + seg.duration, elapsed);
                 DoSectorSweep(id, i, seg, progress);
 
